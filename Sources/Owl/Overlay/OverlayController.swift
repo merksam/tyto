@@ -63,6 +63,8 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     func beginSession(options: SessionOptions) async throws {
         guard session == nil else { throw OwlError.sessionAlreadyActive }
+        color = .red  // red is the default colour for every new capture
+        Settings.lastColor = .red
         let start = ContinuousClock.now
         var timings = CaptureTimings()
         timings.requestedAt = Date()
