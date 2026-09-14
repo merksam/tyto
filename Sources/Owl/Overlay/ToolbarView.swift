@@ -7,6 +7,7 @@ protocol ToolbarDelegate: AnyObject {
     func toolbar(_ toolbar: ToolbarView, didPick width: WidthPreset)
     func toolbarDidRequestUndo(_ toolbar: ToolbarView)
     func toolbarDidRequestRedo(_ toolbar: ToolbarView)
+    func toolbarDidRequestSave(_ toolbar: ToolbarView)
     func toolbarDidRequestCopy(_ toolbar: ToolbarView)
     func toolbarDidRequestCancel(_ toolbar: ToolbarView)
 }
@@ -22,6 +23,7 @@ final class ToolbarView: NSView {
     private let widths = NSSegmentedControl()
     private let undoButton = NSButton()
     private let redoButton = NSButton()
+    private let saveButton = NSButton()
     private let copyButton = NSButton()
     private let cancelButton = NSButton()
 
@@ -39,6 +41,13 @@ final class ToolbarView: NSView {
         undoButton.target = self; undoButton.action = #selector(undoTapped)
         Self.configureIconButton(redoButton, symbol: "arrow.uturn.forward", tip: "Redo (⇧⌘Z)")
         redoButton.target = self; redoButton.action = #selector(redoTapped)
+
+        saveButton.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: "Save")
+        saveButton.bezelStyle = .glass
+        saveButton.controlSize = .large
+        saveButton.toolTip = "Save to file… (⌘S)"
+        saveButton.target = self
+        saveButton.action = #selector(saveTapped)
 
         copyButton.title = "Copy"
         copyButton.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Copy")
@@ -59,7 +68,7 @@ final class ToolbarView: NSView {
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
         for v in [tools, Self.separator(), colors, Self.separator(), widths, Self.separator(),
-                  undoButton, redoButton, Self.separator(), copyButton, cancelButton] {
+                  undoButton, redoButton, Self.separator(), saveButton, copyButton, cancelButton] {
             stack.addArrangedSubview(v)
         }
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -181,6 +190,7 @@ final class ToolbarView: NSView {
 
     @objc private func undoTapped() { delegate?.toolbarDidRequestUndo(self) }
     @objc private func redoTapped() { delegate?.toolbarDidRequestRedo(self) }
+    @objc private func saveTapped() { delegate?.toolbarDidRequestSave(self) }
     @objc private func copyTapped() { delegate?.toolbarDidRequestCopy(self) }
     @objc private func cancelTapped() { delegate?.toolbarDidRequestCancel(self) }
 }

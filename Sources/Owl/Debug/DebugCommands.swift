@@ -67,6 +67,40 @@ enum DebugCommands {
             overlay.cancel()
             return .success()
 
+        case "savefile":
+            guard let path = req.path else { throw OwlError.badRequest("savefile needs a path") }
+            try overlay.saveToFile(URL(fileURLWithPath: path))
+            return .success(["path": .string(path)])
+
+        case "windows":
+            guard let s = overlay.session else { throw OwlError.noSession }
+            let id = try activeDisplay(overlay, req.display, capturer: capturer)
+            let rects = s.windowRects[id] ?? []
+            return .success(["display": JSONValue(Int(id)), "count": JSONValue(rects.count),
+                             "windows": .array(rects.map(rectJSON))])
+
+        case "enumwindows":
+            // Enumerate on-screen windows for a display without starting a session (non-disruptive).
+            let id = try resolveSingle(req.display ?? "main", capturer: capturer)
+            guard let d = capturer.displays().first(where: { $0.id == id }) else { throw OwlError.unknownDisplay("\(id)") }
+            let rects = capturer.windowRects(on: d)
+            return .success(["display": JSONValue(Int(id)), "count": JSONValue(rects.count),
+                             "windows": .array(rects.prefix(12).map(rectJSON))])
+
+        case "injectwindow":
+            guard let x = req.x, let y = req.y, let w = req.w, let h = req.h else {
+                throw OwlError.badRequest("injectwindow needs x y w h")
+            }
+            let id = try activeDisplay(overlay, req.display, capturer: capturer)
+            overlay.testInjectWindow(PixelRect(x: x, y: y, width: w, height: h), on: id)
+            return .success(stateJSON(overlay))
+
+        case "hover":
+            guard let x = req.x, let y = req.y else { throw OwlError.badRequest("hover needs x y") }
+            let id = try activeDisplay(overlay, req.display, capturer: capturer)
+            overlay.hover(at: PixelPoint(x: x, y: y), on: id)
+            return .success(stateJSON(overlay))
+
         // MARK: Editor
 
         case "tool":
@@ -262,6 +296,7 @@ enum DebugCommands {
         } else {
             d["selection"] = .null
         }
+        d["hoverRect"] = s.hoverRect.map(rectJSON) ?? .null
         d["shapeCount"] = JSONValue(s.document.shapes.count)
         d["selectedShape"] = s.document.selectedID.map { .string($0.uuidString) } ?? .null
         d["canUndo"] = .bool(s.history.canUndo)

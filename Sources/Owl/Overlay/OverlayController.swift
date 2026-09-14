@@ -13,6 +13,7 @@ struct SessionOptions: Sendable {
 
 enum SessionOutcome: Sendable {
     case copied(rect: PixelRect, displayID: CGDirectDisplayID)
+    case saved(URL)
     case cancelled
 }
 
@@ -33,6 +34,8 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         var order: [CGDirectDisplayID] = []
         var activeDisplay: CGDirectDisplayID?
         var selection: SelectionModel?
+        var windowRects: [CGDirectDisplayID: [PixelRect]] = [:]
+        var hoverRect: PixelRect?
         var document = AnnotationDocument()
         var history = History<AnnotationDocument>()
         var dragMode: DragMode = .none
@@ -95,6 +98,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             window.orderFrontRegardless()
             s.snapshots[snap.displayID] = snap
         }
+        for d in wanted { s.windowRects[d.id] = capturer.windowRects(on: d) }
         session = s
 
         if options.interactive {
@@ -152,8 +156,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         return (rect, image)
     }
 
-    private func end(_ outcome: SessionOutcome) {
-        guard let s = session else { return }
+    private func teardown(_ s: Session, reactivatePrevious: Bool) {
         toolbarPanel.orderOut(nil)
         for id in s.order {
             guard let w = windows[id] else { continue }
@@ -163,11 +166,66 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         if s.options.interactive {
             NSApp.presentationOptions = s.previousPresentation
             if s.cursorPushed { NSCursor.pop() }
-            // Hand focus back so the user can ⌘V straight away.
-            s.previousApp?.activate()
+            if reactivatePrevious { s.previousApp?.activate() }
         }
+    }
+
+    private func end(_ outcome: SessionOutcome) {
+        guard let s = session else { return }
+        teardown(s, reactivatePrevious: true)
         session = nil
         onSessionEnd?(outcome)
+    }
+
+    static func defaultSaveDirectory() -> URL {
+        let dir = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Owl", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    static func timestampedName() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        return "Owl \(f.string(from: Date())).png"
+    }
+
+    /// Cmd+S: render the composite, dismiss the overlay, and present a save panel over ~/Pictures/Owl.
+    func save() {
+        guard let s = session else { return }
+        if let id = s.activeDisplay, let v = windows[id]?.selectionView, v.isEditingText { v.commitTextEditing() }
+        let image: CGImage
+        do { image = try exportImage().image } catch {
+            Log.overlay.error("save failed to render: \(String(describing: error))")
+            return
+        }
+        let previousApp = s.previousApp
+        let interactive = s.options.interactive
+        teardown(s, reactivatePrevious: false)
+        session = nil
+
+        guard interactive else { onSessionEnd?(.cancelled); return }
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.png]
+        panel.canCreateDirectories = true
+        panel.directoryURL = Self.defaultSaveDirectory()
+        panel.nameFieldStringValue = Self.timestampedName()
+        let response = panel.runModal()
+        var saved: URL?
+        if response == .OK, let url = panel.url {
+            do { try PNGEncoder.write(image, to: url); saved = url }
+            catch { Log.overlay.error("save failed to write: \(String(describing: error))") }
+        }
+        previousApp?.activate()
+        onSessionEnd?(saved.map(SessionOutcome.saved) ?? .cancelled)
+    }
+
+    /// Test path: render the composite, write it to `url`, and end the session (no panel).
+    func saveToFile(_ url: URL) throws {
+        let (_, image) = try exportImage()
+        try PNGEncoder.write(image, to: url)
+        end(.saved(url))
     }
 
     // MARK: Editor state
@@ -255,6 +313,32 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     // MARK: Input routing (shared by the views and the debug harness)
 
+    /// Cursor moved with no button down: highlight the window under it (snap candidate),
+    /// but only before any selection exists and while not dragging.
+    func hover(at p: PixelPoint, on displayID: CGDirectDisplayID) {
+        guard var s = session else { return }
+        if case .none = s.dragMode {} else { return }
+        let hasSelection = (s.activeDisplay == displayID) && (s.selection?.hasSelection == true)
+        if hasSelection {
+            if s.hoverRect != nil { s.hoverRect = nil; session = s; renderActive() }
+            return
+        }
+        let candidate = s.windowRects[displayID]?.first { $0.contains(p) }
+        if candidate != s.hoverRect || s.activeDisplay != displayID {
+            s.activeDisplay = displayID
+            s.hoverRect = candidate
+            session = s
+            renderActive()
+        }
+    }
+
+    func clearHover() {
+        guard var s = session, s.hoverRect != nil else { return }
+        s.hoverRect = nil
+        session = s
+        renderActive()
+    }
+
     func press(at p: PixelPoint, on displayID: CGDirectDisplayID) {
         guard var s = session, let snap = s.snapshots[displayID] else { return }
         if let v = windows[displayID]?.selectionView, v.isEditingText { v.commitTextEditing(); s = session! }
@@ -267,6 +351,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         }
         let slop = Int((SelectionView.handleSlopPoints * scale).rounded())
         let hit = s.selection!.hitTest(p, slop: slop)
+        s.hoverRect = nil
 
         switch hit {
         case .handle, .outside:
@@ -361,6 +446,13 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             v.commitTextEditing()
             return
         }
+        let hasSelection = (s.activeDisplay == displayID) && (s.selection?.hasSelection == true)
+        if !hasSelection {
+            if let candidate = s.windowRects[displayID]?.first(where: { $0.contains(p) }) {
+                try? setSelection(candidate, on: displayID)
+            }
+            return
+        }
         guard s.activeDisplay == displayID, let model = s.selection, model.hitTest(p, slop: slop) == .inside else { return }
         switch tool {
         case .select:
@@ -395,6 +487,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         var state = SelectionView.RenderState()
         guard id == s.activeDisplay else { return state }
         state.selection = s.selection
+        state.hoverRect = s.hoverRect
         state.document = s.document
         state.showToolbar = s.selection?.hasSelection == true
         state.tool = tool
@@ -444,6 +537,12 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         toolbarPanel.orderFrontRegardless()
     }
 
+    func testInjectWindow(_ rect: PixelRect, on displayID: CGDirectDisplayID) {
+        guard var s = session else { return }
+        s.windowRects[displayID, default: []].insert(rect, at: 0)
+        session = s
+    }
+
     func testClickToolSegment(_ index: Int) throws {
         guard session != nil else { throw OwlError.noSession }
         toolbarPanel.annotationToolbar.testClickTool(index)
@@ -455,6 +554,8 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     func selectionView(_ view: SelectionView, dragTo pixel: PixelPoint) { drag(to: pixel, on: view.displayID) }
     func selectionViewDidRelease(_ view: SelectionView) { release(on: view.displayID) }
     func selectionView(_ view: SelectionView, clickAt pixel: PixelPoint) { click(at: pixel, on: view.displayID) }
+    func selectionView(_ view: SelectionView, hoverAt pixel: PixelPoint) { hover(at: pixel, on: view.displayID) }
+    func selectionViewDidExit(_ view: SelectionView) { clearHover() }
 
     func selectionView(_ view: SelectionView, commitText text: String, at pixel: PixelPoint) {
         addText(text, at: pixel)
@@ -490,6 +591,9 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         case (.command, "c"):
             do { try copy() } catch { Log.overlay.error("copy failed: \(String(describing: error))") }
             return true
+        case (.command, "s"):
+            save()
+            return true
         case (.command, "z"):
             undo()
             return true
@@ -511,5 +615,6 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     func toolbarDidRequestCopy(_ toolbar: ToolbarView) {
         do { try copy() } catch { Log.overlay.error("copy failed: \(String(describing: error))") }
     }
+    func toolbarDidRequestSave(_ toolbar: ToolbarView) { save() }
     func toolbarDidRequestCancel(_ toolbar: ToolbarView) { cancel() }
 }

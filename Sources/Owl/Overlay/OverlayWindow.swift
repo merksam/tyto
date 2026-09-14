@@ -22,6 +22,7 @@ final class OverlayWindow: NSWindow {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         contentView = selectionView
         initialFirstResponder = selectionView
+        acceptsMouseMovedEvents = true
     }
 
     override func keyDown(with event: NSEvent) {

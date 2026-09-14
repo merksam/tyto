@@ -13,6 +13,9 @@ usage: owlctl <command> [options]
   copy                                  crop + copy to clipboard, end session
   cancel                                end session without copying
   export PATH                           render frozen frame + annotations to PATH without ending
+  savefile PATH                         render composite, write to PATH, end session
+  windows                               list snap-to-window candidate rects
+  hover X Y                             set the snap-to-window hover candidate
   snapshot PATH [--display SPEC]        PNG of a display as it looks now (incl. Owl's overlay)
   clipboard PATH                        write the clipboard image to PATH as PNG
   timings                               last session's latency numbers
@@ -65,8 +68,8 @@ case "draw":
     guard positional.count == 4, let x = Int(positional[0]), let y = Int(positional[1]),
           let x2 = Int(positional[2]), let y2 = Int(positional[3]) else { die("draw needs X1 Y1 X2 Y2") }
     request.x = x; request.y = y; request.x2 = x2; request.y2 = y2
-case "click":
-    guard positional.count == 2, let x = Int(positional[0]), let y = Int(positional[1]) else { die("click needs X Y") }
+case "click", "hover":
+    guard positional.count == 2, let x = Int(positional[0]), let y = Int(positional[1]) else { die("\(cmd) needs X Y") }
     request.x = x; request.y = y
 case "text":
     guard positional.count >= 3, let x = Int(positional[0]), let y = Int(positional[1]) else { die("text needs X Y STRING") }
@@ -78,12 +81,12 @@ case "tool", "color", "width", "uitool":
 case "set":
     guard positional.count == 2 else { die("set needs KEY VALUE") }
     request.key = positional[0]; request.value = positional[1]
-case "export":
-    guard let p = positional.first else { die("export needs a PATH") }
+case "export", "savefile":
+    guard let p = positional.first else { die("\(cmd) needs a PATH") }
     request.path = URL(fileURLWithPath: p).standardizedFileURL.path
-case "select":
+case "select", "injectwindow":
     guard positional.count == 4, let x = Int(positional[0]), let y = Int(positional[1]),
-          let w = Int(positional[2]), let h = Int(positional[3]) else { die("select needs X Y W H") }
+          let w = Int(positional[2]), let h = Int(positional[3]) else { die("\(cmd) needs X Y W H") }
     request.x = x; request.y = y; request.w = w; request.h = h
 case "snapshot", "clipboard":
     guard let p = positional.first else { die("\(cmd) needs a PATH") }

@@ -7,6 +7,8 @@ protocol SelectionViewDelegate: AnyObject {
     func selectionView(_ view: SelectionView, dragTo pixel: PixelPoint)
     func selectionViewDidRelease(_ view: SelectionView)
     func selectionView(_ view: SelectionView, clickAt pixel: PixelPoint)
+    func selectionView(_ view: SelectionView, hoverAt pixel: PixelPoint)
+    func selectionViewDidExit(_ view: SelectionView)
     func selectionView(_ view: SelectionView, keyDown event: NSEvent)
     func selectionView(_ view: SelectionView, keyEquivalent event: NSEvent) -> Bool
     func selectionView(_ view: SelectionView, commitText text: String, at pixel: PixelPoint)
@@ -27,6 +29,7 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
     private let dimLayer = CAShapeLayer()
     private let borderLayer = CAShapeLayer()
     private let handlesLayer = CAShapeLayer()
+    private let hoverLayer = CAShapeLayer()
     private let sizeLabel = CATextLayer()
     private let labelFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
 
@@ -62,6 +65,11 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         handlesLayer.strokeColor = NSColor.black.withAlphaComponent(0.6).cgColor
         handlesLayer.lineWidth = 1
 
+        hoverLayer.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        hoverLayer.strokeColor = NSColor.controlAccentColor.cgColor
+        hoverLayer.lineWidth = 2
+        hoverLayer.isHidden = true
+
         sizeLabel.font = labelFont
         sizeLabel.fontSize = labelFont.pointSize
         sizeLabel.foregroundColor = NSColor.white.cgColor
@@ -75,6 +83,7 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         root.addSublayer(imageLayer)
         annotationView.isHidden = true
         addSubview(annotationView)
+        root.addSublayer(hoverLayer)
         for l in [dimLayer, borderLayer, handlesLayer, sizeLabel] { root.addSublayer(l) }
 
         let pan = NSPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
@@ -84,6 +93,22 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick(_:)))
         click.delegate = self
         addGestureRecognizer(click)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds,
+                                       options: [.activeAlways, .mouseMoved, .mouseEnteredAndExited, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        delegate?.selectionView(self, hoverAt: geometry.pixel(fromPoint: convert(event.locationInWindow, from: nil)))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        delegate?.selectionViewDidExit(self)
     }
 
     @available(*, unavailable)
@@ -98,7 +123,7 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         let scale = snapshot.geometry.scale
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        for l in [imageLayer, dimLayer, borderLayer, handlesLayer, sizeLabel] { l.contentsScale = scale }
+        for l in [imageLayer, dimLayer, borderLayer, handlesLayer, hoverLayer, sizeLabel] { l.contentsScale = scale }
         imageLayer.contents = snapshot.image
         CATransaction.commit()
         annotationView.base = snapshot.image
@@ -122,7 +147,7 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        for l in [imageLayer, dimLayer, borderLayer, handlesLayer] { l.frame = bounds }
+        for l in [imageLayer, dimLayer, borderLayer, handlesLayer, hoverLayer] { l.frame = bounds }
         CATransaction.commit()
     }
 
@@ -130,6 +155,7 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
 
     struct RenderState {
         var selection: SelectionModel?
+        var hoverRect: PixelRect?
         var document = AnnotationDocument()
         var showToolbar = false
         var tool: Tool = .rect
@@ -150,8 +176,15 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
             handlesLayer.path = nil
             sizeLabel.isHidden = true
             annotationView.isHidden = true
+            if let hover = state.hoverRect {
+                hoverLayer.path = CGPath(rect: geometry.rect(fromPixelRect: hover), transform: nil)
+                hoverLayer.isHidden = false
+            } else {
+                hoverLayer.isHidden = true
+            }
             return
         }
+        hoverLayer.isHidden = true
 
         let pr = geometry.rect(fromPixelRect: r)
         let dim = CGMutablePath()
