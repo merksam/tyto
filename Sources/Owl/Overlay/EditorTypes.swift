@@ -82,30 +82,6 @@ enum WidthPreset: String, CaseIterable, Sendable {
     }
 }
 
-enum Settings {
-    private static let defaults = UserDefaults.standard
-
-    static var copyAsFile: Bool {
-        get { defaults.bool(forKey: "copyAsFile") }
-        set { defaults.set(newValue, forKey: "copyAsFile") }
-    }
-
-    static var lastTool: Tool {
-        get { defaults.string(forKey: "lastTool").flatMap(Tool.init(rawValue:)) ?? .rect }
-        set { defaults.set(newValue.rawValue, forKey: "lastTool") }
-    }
-
-    static var lastColor: RGBAColor {
-        get { defaults.string(forKey: "lastColor").flatMap(RGBAColor.named) ?? .red }  // red is the default
-        set { defaults.set(newValue.name ?? "red", forKey: "lastColor") }
-    }
-
-    static var lastWidth: WidthPreset {
-        get { defaults.string(forKey: "lastWidth").flatMap(WidthPreset.init(rawValue:)) ?? .medium }
-        set { defaults.set(newValue.rawValue, forKey: "lastWidth") }
-    }
-}
-
 extension RGBAColor {
     var nsColor: NSColor { NSColor(srgbRed: r, green: g, blue: b, alpha: a) }
 }

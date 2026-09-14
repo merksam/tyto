@@ -172,11 +172,42 @@ enum DebugCommands {
 
         case "set":
             guard let key = req.key, let value = req.value else { throw OwlError.badRequest("set needs key value") }
+            let on = ["1", "true", "on", "yes"].contains(value.lowercased())
             switch key {
-            case "copyAsFile": Settings.copyAsFile = ["1", "true", "on", "yes"].contains(value.lowercased())
+            case "copyAsFile": Settings.copyAsFile = on
+            case "autoSave": Settings.autoSaveRecent = on
+            case "saveDir": Settings.saveDirectory = URL(fileURLWithPath: value, isDirectory: true)
+            case "defaultTool":
+                guard let t = Tool(rawValue: value) else { throw OwlError.badRequest("bad tool") }
+                Settings.defaultTool = t
+            case "defaultColor":
+                guard let c = RGBAColor.named(value) else { throw OwlError.badRequest("bad color") }
+                Settings.defaultColor = c
+            case "defaultWidth":
+                guard let w = WidthPreset(rawValue: value) else { throw OwlError.badRequest("bad width") }
+                Settings.defaultWidth = w
             default: throw OwlError.badRequest("unknown setting \(key)")
             }
-            return .success(["copyAsFile": .bool(Settings.copyAsFile)])
+            return .success(settingsJSON())
+
+        case "settings":
+            return .success(settingsJSON())
+
+        case "recent":
+            let urls = CaptureHistory.recent
+            return .success(["count": JSONValue(urls.count), "files": .array(urls.map { .string($0.path) })])
+
+        case "testhistory":
+            // Exercises CaptureHistory (auto-save + recent list) without a screen capture.
+            let w = 120, h = 80
+            let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
+            ctx.setFillColor(CGColor(srgbRed: 0.9, green: 0.2, blue: 0.2, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+            let url = CaptureHistory.record(ctx.makeImage()!)
+            return .success(["written": .string(url?.path ?? ""),
+                             "recentCount": JSONValue(CaptureHistory.recent.count)])
 
         case "snapshot":
             guard let path = req.path else { throw OwlError.badRequest("snapshot needs a path") }
@@ -255,6 +286,20 @@ enum DebugCommands {
             "pixelWidth": JSONValue(px.width),
             "pixelHeight": JSONValue(px.height),
         ])
+    }
+
+    private static func settingsJSON() -> [String: JSONValue] {
+        [
+            "copyAsFile": .bool(Settings.copyAsFile),
+            "autoSaveRecent": .bool(Settings.autoSaveRecent),
+            "saveDirectory": .string(Settings.saveDirectory.path),
+            "defaultTool": .string(Settings.defaultTool.rawValue),
+            "defaultColor": .string(Settings.defaultColor.name ?? "custom"),
+            "defaultWidth": .string(Settings.defaultWidth.rawValue),
+            "hotKeyDisplay": .string(Settings.hotKeyDisplay),
+            "hotKeyCode": JSONValue(Int(Settings.hotKeyCode)),
+            "launchAtLogin": .bool(Settings.launchAtLogin),
+        ]
     }
 
     private static func rectJSON(_ r: PixelRect) -> JSONValue {

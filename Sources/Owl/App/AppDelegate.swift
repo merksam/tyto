@@ -4,6 +4,7 @@ import OwlCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenu: StatusMenu?
     private var hotkey: GlobalHotkey?
+    private var settingsWindowController: SettingsWindowController?
     private var debugServer: DebugServer?
     let capturer = ScreenCapturer()
     private(set) var overlay: OverlayController!
@@ -13,10 +14,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlay.onSessionEnd = { outcome in
             Log.overlay.info("session ended: \(String(describing: outcome))")
         }
-        statusMenu = StatusMenu { [weak self] in self?.requestCapture() }
-        hotkey = GlobalHotkey(keyCode: GlobalHotkey.defaultKeyCode, modifiers: GlobalHotkey.defaultModifiers) { [weak self] in
-            self?.requestCapture()
-        }
+        statusMenu = StatusMenu(onCapture: { [weak self] in self?.requestCapture() },
+                                onOpenSettings: { [weak self] in self?.openSettings() })
+        registerHotkey()
+        NotificationCenter.default.addObserver(self, selector: #selector(hotkeyChanged),
+                                               name: Settings.hotkeyChanged, object: nil)
 
         if DebugServer.isEnabled {
             let router = DebugCommandRouter(app: self)
@@ -40,6 +42,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         debugServer?.stop()
         hotkey?.unregister()
+    }
+
+    @objc private func hotkeyChanged() { registerHotkey() }
+
+    func registerHotkey() {
+        hotkey?.unregister()
+        hotkey = GlobalHotkey(keyCode: Settings.hotKeyCode, modifiers: Settings.hotKeyModifiers) { [weak self] in
+            self?.requestCapture()
+        }
+    }
+
+    func openSettings() {
+        if settingsWindowController == nil { settingsWindowController = SettingsWindowController() }
+        settingsWindowController?.show()
     }
 
     /// Hotkey / menu entry point: the interactive, all-displays session.

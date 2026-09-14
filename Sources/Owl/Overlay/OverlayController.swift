@@ -51,9 +51,9 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     private(set) var lastTimings = CaptureTimings()
     var onSessionEnd: ((SessionOutcome) -> Void)?
 
-    private(set) var tool: Tool = Settings.lastTool
-    private(set) var color: RGBAColor = Settings.lastColor
-    private(set) var width: WidthPreset = Settings.lastWidth
+    private(set) var tool: Tool = Settings.defaultTool
+    private(set) var color: RGBAColor = Settings.defaultColor
+    private(set) var width: WidthPreset = Settings.defaultWidth
 
     init(capturer: ScreenCapturer) {
         self.capturer = capturer
@@ -66,8 +66,10 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     func beginSession(options: SessionOptions) async throws {
         guard session == nil else { throw OwlError.sessionAlreadyActive }
-        color = .red  // red is the default colour for every new capture
-        Settings.lastColor = .red
+        // Every capture starts from the configured defaults (colour, tool, width).
+        tool = Settings.defaultTool
+        color = Settings.defaultColor
+        width = Settings.defaultWidth
         let start = ContinuousClock.now
         var timings = CaptureTimings()
         timings.requestedAt = Date()
@@ -150,6 +152,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         guard let id = session?.activeDisplay else { throw OwlError.noSession }
         let start = ContinuousClock.now
         try Clipboard.write(image: image, alsoAsFile: Settings.copyAsFile)
+        CaptureHistory.record(image)
         lastTimings.copyMS = (ContinuousClock.now - start).milliseconds
         Log.overlay.info("copied \(image.width)x\(image.height) in \(self.lastTimings.copyMS ?? 0, format: .fixed(precision: 1)) ms")
         end(.copied(rect: rect, displayID: id))
@@ -209,12 +212,13 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
-        panel.directoryURL = Self.defaultSaveDirectory()
-        panel.nameFieldStringValue = Self.timestampedName()
+        let dir = Self.defaultSaveDirectory()
+        panel.directoryURL = dir
+        panel.nameFieldStringValue = CaptureHistory.uniqueURL(in: dir, name: Self.timestampedName()).lastPathComponent
         let response = panel.runModal()
         var saved: URL?
         if response == .OK, let url = panel.url {
-            do { try PNGEncoder.write(image, to: url); saved = url }
+            do { try PNGEncoder.write(image, to: url); saved = url; CaptureHistory.note(url) }
             catch { Log.overlay.error("save failed to write: \(String(describing: error))") }
         }
         previousApp?.activate()
@@ -225,6 +229,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     func saveToFile(_ url: URL) throws {
         let (_, image) = try exportImage()
         try PNGEncoder.write(image, to: url)
+        CaptureHistory.note(url)
         end(.saved(url))
     }
 
@@ -232,13 +237,11 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     func setTool(_ t: Tool) {
         tool = t
-        Settings.lastTool = t
         renderActive()
     }
 
     func setColor(_ c: RGBAColor) {
         color = c
-        Settings.lastColor = c
         if var s = session, var shape = s.document.selectedShape {
             s.history.record(s.document)
             shape.style.color = c
@@ -250,7 +253,6 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     func setWidth(_ w: WidthPreset) {
         width = w
-        Settings.lastWidth = w
         if var s = session, var shape = s.document.selectedShape, let snap = s.snapshots[s.activeDisplay ?? 0] {
             s.history.record(s.document)
             let style = w.style(color: shape.style.color, scale: snap.geometry.scale)

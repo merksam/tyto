@@ -29,7 +29,10 @@ usage: owlctl <command> [options]
   text X Y STRING                       add a text annotation at X Y
   undo | redo | delete                  history / delete the selected shape
   shapes                                list annotations
-  set KEY VALUE                         settings (copyAsFile on|off)
+  set KEY VALUE                         copyAsFile|autoSave on/off, saveDir PATH,
+                                        defaultTool|defaultColor|defaultWidth NAME
+  settings                              print current settings
+  recent                                list recent captures
 
 SPEC: all | main | secondary | <CGDirectDisplayID>     (default: all for capture, main otherwise)
 Socket: $OWL_DEBUG_SOCKET or ~/Library/Application Support/Owl/debug.sock
