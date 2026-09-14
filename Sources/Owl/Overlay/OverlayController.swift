@@ -79,6 +79,10 @@ final class OverlayController: SelectionViewDelegate {
         if options.interactive {
             NSApp.presentationOptions = [.autoHideDock, .autoHideMenuBar, .disableScreenCornerInteractions]
             NSApp.activate()
+            if !NSApp.isActive {
+                // Cooperative activation can be refused; without key status Esc would never arrive.
+                NSApp.activate(ignoringOtherApps: true)
+            }
             let mouse = NSEvent.mouseLocation
             let keyWindow = s.order.compactMap { windows[$0] }.first { $0.frame.contains(mouse) }
                 ?? s.order.first.flatMap { windows[$0] }

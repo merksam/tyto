@@ -43,8 +43,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Hotkey / menu entry point: the interactive, all-displays session.
+    /// Pressing the hotkey while a session is up cancels it: Carbon hotkeys work regardless of
+    /// focus, so this is the escape hatch if the overlay ever fails to become key.
     func requestCapture() {
-        guard !overlay.isActive else { return }
+        if overlay.isActive {
+            overlay.cancel()
+            return
+        }
         Task {
             do {
                 try await overlay.beginSession(options: .interactive)
