@@ -113,3 +113,17 @@ public struct DisplayGeometry: Hashable, Sendable {
                width: CGFloat(r.width) / scale, height: CGFloat(r.height) / scale)
     }
 }
+
+public extension PixelRect {
+    func insetBy(_ d: Int) -> PixelRect {
+        PixelRect(x: x + d, y: y + d, width: width - 2 * d, height: height - 2 * d)
+    }
+
+    func expanded(by d: Int) -> PixelRect { insetBy(-d) }
+
+    var center: PixelPoint { PixelPoint(x: midX, y: midY) }
+}
+
+public extension PixelPoint {
+    var cgPoint: CGPoint { CGPoint(x: x, y: y) }
+}

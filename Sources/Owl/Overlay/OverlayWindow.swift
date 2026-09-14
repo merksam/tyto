@@ -21,25 +21,16 @@ final class OverlayWindow: NSWindow {
         animationBehavior = .none
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         contentView = selectionView
+        initialFirstResponder = selectionView
     }
 
     override func keyDown(with event: NSEvent) {
-        switch event.keyCode {
-        case 53: // Esc
-            selectionView.delegate?.selectionView(selectionView, keyCommand: .cancel)
-        case 36, 76: // Return, keypad Enter
-            selectionView.delegate?.selectionView(selectionView, keyCommand: .copy)
-        default:
-            break // swallow; no beep
-        }
+        // Text editing gets its keys through the responder chain, not here.
+        selectionView.delegate?.selectionView(selectionView, keyDown: event)
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if mods == .command, event.charactersIgnoringModifiers == "c" {
-            selectionView.delegate?.selectionView(selectionView, keyCommand: .copy)
-            return true
-        }
+        if selectionView.delegate?.selectionView(selectionView, keyEquivalent: event) == true { return true }
         return super.performKeyEquivalent(with: event)
     }
 }

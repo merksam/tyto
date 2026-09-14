@@ -56,9 +56,88 @@ enum DebugCommands {
                 "copyMS": overlay.lastTimings.json["copyMS"] ?? .null,
             ])
 
+        case "export":
+            guard let path = req.path else { throw OwlError.badRequest("export needs a path") }
+            let (rect, image) = try overlay.exportImage()
+            try PNGEncoder.write(image, to: URL(fileURLWithPath: path))
+            return .success(["path": .string(path), "rect": rectJSON(rect),
+                             "width": JSONValue(image.width), "height": JSONValue(image.height)])
+
         case "cancel":
             overlay.cancel()
             return .success()
+
+        // MARK: Editor
+
+        case "tool":
+            guard let name = req.value, let t = Tool(rawValue: name) else {
+                throw OwlError.badRequest("tool needs one of \(Tool.allCases.map(\.rawValue))")
+            }
+            overlay.setTool(t)
+            return .success(stateJSON(overlay))
+
+        case "color":
+            guard let name = req.value, let c = RGBAColor.named(name) else {
+                throw OwlError.badRequest("color needs one of \(RGBAColor.palette.map(\.name))")
+            }
+            overlay.setColor(c)
+            return .success(stateJSON(overlay))
+
+        case "width":
+            guard let name = req.value, let w = WidthPreset(rawValue: name) else {
+                throw OwlError.badRequest("width needs one of \(WidthPreset.allCases.map(\.rawValue))")
+            }
+            overlay.setWidth(w)
+            return .success(stateJSON(overlay))
+
+        case "draw":
+            guard let x = req.x, let y = req.y, let x2 = req.x2, let y2 = req.y2 else {
+                throw OwlError.badRequest("draw needs x1 y1 x2 y2")
+            }
+            let id = try activeDisplay(overlay, req.display, capturer: capturer)
+            overlay.press(at: PixelPoint(x: x, y: y), on: id)
+            // A few intermediate points, like a real drag.
+            for step in 1...4 {
+                let t = Double(step) / 4
+                overlay.drag(to: PixelPoint(x: x + Int(Double(x2 - x) * t), y: y + Int(Double(y2 - y) * t)), on: id)
+            }
+            overlay.release(on: id)
+            return .success(stateJSON(overlay))
+
+        case "click":
+            guard let x = req.x, let y = req.y else { throw OwlError.badRequest("click needs x y") }
+            let id = try activeDisplay(overlay, req.display, capturer: capturer)
+            overlay.click(at: PixelPoint(x: x, y: y), on: id)
+            return .success(stateJSON(overlay))
+
+        case "text":
+            guard let x = req.x, let y = req.y, let text = req.value else { throw OwlError.badRequest("text needs x y and a string") }
+            overlay.addText(text, at: PixelPoint(x: x, y: y))
+            return .success(stateJSON(overlay))
+
+        case "undo":
+            overlay.undo()
+            return .success(stateJSON(overlay))
+
+        case "redo":
+            overlay.redo()
+            return .success(stateJSON(overlay))
+
+        case "delete":
+            overlay.deleteSelectedShape()
+            return .success(stateJSON(overlay))
+
+        case "shapes":
+            guard let s = overlay.session else { throw OwlError.noSession }
+            return .success(["shapes": .array(s.document.shapes.map(shapeJSON)), "selected": s.document.selectedID.map { .string($0.uuidString) } ?? .null])
+
+        case "set":
+            guard let key = req.key, let value = req.value else { throw OwlError.badRequest("set needs key value") }
+            switch key {
+            case "copyAsFile": Settings.copyAsFile = ["1", "true", "on", "yes"].contains(value.lowercased())
+            default: throw OwlError.badRequest("unknown setting \(key)")
+            }
+            return .success(["copyAsFile": .bool(Settings.copyAsFile)])
 
         case "snapshot":
             guard let path = req.path else { throw OwlError.badRequest("snapshot needs a path") }
@@ -78,6 +157,8 @@ enum DebugCommands {
                 data["width"] = JSONValue(size.width)
                 data["height"] = JSONValue(size.height)
             }
+            let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self]) as? [URL] ?? []
+            data["fileURLs"] = .array(urls.map { .string($0.path) })
             return .success(data)
 
         case "timings":
@@ -93,6 +174,13 @@ enum DebugCommands {
     }
 
     // MARK: helpers
+
+    private static func activeDisplay(_ overlay: OverlayController, _ spec: String?, capturer: ScreenCapturer) throws -> CGDirectDisplayID {
+        if let spec { return try resolveSingle(spec, capturer: capturer) }
+        guard let s = overlay.session else { throw OwlError.noSession }
+        guard let id = s.activeDisplay ?? s.order.first else { throw OwlError.noDisplays }
+        return id
+    }
 
     private static func resolveDisplays(_ spec: String?, capturer: ScreenCapturer) throws -> [CGDirectDisplayID]? {
         guard let spec, spec != "all" else { return nil }
@@ -134,20 +222,45 @@ enum DebugCommands {
         .object(["x": JSONValue(r.x), "y": JSONValue(r.y), "width": JSONValue(r.width), "height": JSONValue(r.height)])
     }
 
-    private static func stateJSON(_ overlay: OverlayController) -> [String: JSONValue] {
-        guard let s = overlay.session else { return ["sessionActive": .bool(false)] }
+    private static func shapeJSON(_ s: Shape) -> JSONValue {
         var d: [String: JSONValue] = [
-            "sessionActive": .bool(true),
-            "interactive": .bool(s.options.interactive),
-            "displays": .array(s.order.map { JSONValue(Int($0)) }),
-            "activeDisplay": s.activeDisplay.map { JSONValue(Int($0)) } ?? .null,
+            "id": .string(s.id.uuidString),
+            "kind": .string(s.kind.rawValue),
+            "start": .object(["x": JSONValue(s.start.x), "y": JSONValue(s.start.y)]),
+            "end": .object(["x": JSONValue(s.end.x), "y": JSONValue(s.end.y)]),
+            "bounds": rectJSON(s.bounds),
+            "color": .string(s.style.color.name ?? "custom"),
+            "strokeWidth": JSONValue(s.style.strokeWidth),
         ]
+        if s.kind == .text { d["text"] = .string(s.text) }
+        if s.kind == .badge { d["number"] = JSONValue(s.number) }
+        return .object(d)
+    }
+
+    private static func stateJSON(_ overlay: OverlayController) -> [String: JSONValue] {
+        var d: [String: JSONValue] = [
+            "tool": .string(overlay.tool.rawValue),
+            "color": .string(overlay.color.name ?? "custom"),
+            "width": .string(overlay.width.rawValue),
+        ]
+        guard let s = overlay.session else {
+            d["sessionActive"] = .bool(false)
+            return d
+        }
+        d["sessionActive"] = .bool(true)
+        d["interactive"] = .bool(s.options.interactive)
+        d["displays"] = .array(s.order.map { JSONValue(Int($0)) })
+        d["activeDisplay"] = s.activeDisplay.map { JSONValue(Int($0)) } ?? .null
         if let sel = s.selection {
             d["selection"] = sel.rect.map(rectJSON) ?? .null
             d["phase"] = .string(String(describing: sel.phase))
         } else {
             d["selection"] = .null
         }
+        d["shapeCount"] = JSONValue(s.document.shapes.count)
+        d["selectedShape"] = s.document.selectedID.map { .string($0.uuidString) } ?? .null
+        d["canUndo"] = .bool(s.history.canUndo)
+        d["canRedo"] = .bool(s.history.canRedo)
         return d
     }
 }

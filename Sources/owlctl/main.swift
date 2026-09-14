@@ -12,10 +12,21 @@ usage: owlctl <command> [options]
   state                                 current session state
   copy                                  crop + copy to clipboard, end session
   cancel                                end session without copying
+  export PATH                           render frozen frame + annotations to PATH without ending
   snapshot PATH [--display SPEC]        PNG of a display as it looks now (incl. Owl's overlay)
   clipboard PATH                        write the clipboard image to PATH as PNG
   timings                               last session's latency numbers
   quit                                  terminate Owl
+
+  tool NAME                             select|rect|ellipse|line|arrow|text|blur|badge
+  color NAME                            red|orange|yellow|green|blue|purple|white|black
+  width NAME                            thin|medium|thick
+  draw X1 Y1 X2 Y2                      press/drag/release with the current tool (display pixels)
+  click X Y                             single click (select a shape, place a badge)
+  text X Y STRING                       add a text annotation at X Y
+  undo | redo | delete                  history / delete the selected shape
+  shapes                                list annotations
+  set KEY VALUE                         settings (copyAsFile on|off)
 
 SPEC: all | main | secondary | <CGDirectDisplayID>     (default: all for capture, main otherwise)
 Socket: $OWL_DEBUG_SOCKET or ~/Library/Application Support/Owl/debug.sock
@@ -50,6 +61,26 @@ while i < args.count {
 }
 
 switch cmd {
+case "draw":
+    guard positional.count == 4, let x = Int(positional[0]), let y = Int(positional[1]),
+          let x2 = Int(positional[2]), let y2 = Int(positional[3]) else { die("draw needs X1 Y1 X2 Y2") }
+    request.x = x; request.y = y; request.x2 = x2; request.y2 = y2
+case "click":
+    guard positional.count == 2, let x = Int(positional[0]), let y = Int(positional[1]) else { die("click needs X Y") }
+    request.x = x; request.y = y
+case "text":
+    guard positional.count >= 3, let x = Int(positional[0]), let y = Int(positional[1]) else { die("text needs X Y STRING") }
+    request.x = x; request.y = y
+    request.value = positional[2...].joined(separator: " ")
+case "tool", "color", "width":
+    guard let v = positional.first else { die("\(cmd) needs a value") }
+    request.value = v
+case "set":
+    guard positional.count == 2 else { die("set needs KEY VALUE") }
+    request.key = positional[0]; request.value = positional[1]
+case "export":
+    guard let p = positional.first else { die("export needs a PATH") }
+    request.path = URL(fileURLWithPath: p).standardizedFileURL.path
 case "select":
     guard positional.count == 4, let x = Int(positional[0]), let y = Int(positional[1]),
           let w = Int(positional[2]), let h = Int(positional[3]) else { die("select needs X Y W H") }

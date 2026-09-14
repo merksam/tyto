@@ -12,6 +12,11 @@ public struct DebugRequest: Codable, Sendable {
     public var path: String?
     /// Test mode: no app activation, no key window, no presentation-option changes.
     public var test: Bool?
+    /// Second point for `draw` (x2, y2); free-form value for `tool`, `color`, `width`, `text`, `set`.
+    public var x2: Int?
+    public var y2: Int?
+    public var value: String?
+    public var key: String?
 
     public init(cmd: String) { self.cmd = cmd }
 }
