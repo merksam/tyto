@@ -11,7 +11,7 @@ BUNDLE_ID="com.owl.app"
 APP="$ROOT/build/$APP_NAME.app"
 
 cd "$ROOT"
-swift build -c "$CONFIG" --product Owl --product owlctl 1>&2
+swift build -c "$CONFIG" 1>&2
 BIN="$(swift build -c "$CONFIG" --show-bin-path)"
 
 rm -rf "$APP"

@@ -115,6 +115,11 @@ enum DebugCommands {
             overlay.addText(text, at: PixelPoint(x: x, y: y))
             return .success(stateJSON(overlay))
 
+        case "uitool":
+            guard let name = req.value, let i = Int(name) else { throw OwlError.badRequest("uitool needs a segment index") }
+            try overlay.testClickToolSegment(i)
+            return .success(stateJSON(overlay))
+
         case "undo":
             overlay.undo()
             return .success(stateJSON(overlay))

@@ -83,6 +83,14 @@ final class ToolbarView: NSView {
 
     var preferredSize: CGSize { stack.fittingSize }
 
+    /// Test hook: fire the tool segment the same way a real click does (selection + action).
+    func testClickTool(_ index: Int) {
+        guard index >= 0, index < tools.segmentCount else { return }
+        tools.selectedSegment = index
+        tools.performClick(nil)
+    }
+
+
     func setState(tool: Tool, color: RGBAColor, width: WidthPreset, canUndo: Bool, canRedo: Bool) {
         tools.selectedSegment = Tool.allCases.firstIndex(of: tool) ?? 0
         colors.selectedSegment = RGBAColor.palette.firstIndex { $0.color == color } ?? 0

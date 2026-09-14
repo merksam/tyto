@@ -72,7 +72,7 @@ case "text":
     guard positional.count >= 3, let x = Int(positional[0]), let y = Int(positional[1]) else { die("text needs X Y STRING") }
     request.x = x; request.y = y
     request.value = positional[2...].joined(separator: " ")
-case "tool", "color", "width":
+case "tool", "color", "width", "uitool":
     guard let v = positional.first else { die("\(cmd) needs a value") }
     request.value = v
 case "set":

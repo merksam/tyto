@@ -63,9 +63,9 @@ enum WidthPreset: String, CaseIterable, Sendable {
 
     var strokePoints: CGFloat {
         switch self {
-        case .thin: 2
-        case .medium: 4
-        case .thick: 7
+        case .thin: 6
+        case .medium: 12
+        case .thick: 21
         }
     }
 
@@ -96,7 +96,7 @@ enum Settings {
     }
 
     static var lastColor: RGBAColor {
-        get { defaults.string(forKey: "lastColor").flatMap(RGBAColor.named) ?? .red }
+        get { defaults.string(forKey: "lastColor").flatMap(RGBAColor.named) ?? .red }  // red is the default
         set { defaults.set(newValue.name ?? "red", forKey: "lastColor") }
     }
 

@@ -22,7 +22,6 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
     private(set) var geometry = DisplayGeometry(pointSize: .zero, scale: 1)
 
     let annotationView = AnnotationView(frame: .zero)
-    let toolbar = ToolbarView(frame: .zero)
 
     private let imageLayer = CALayer()
     private let dimLayer = CAShapeLayer()
@@ -77,8 +76,6 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         annotationView.isHidden = true
         addSubview(annotationView)
         for l in [dimLayer, borderLayer, handlesLayer, sizeLabel] { root.addSublayer(l) }
-        toolbar.isHidden = true
-        addSubview(toolbar)
 
         let pan = NSPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         pan.isCancellableByScrollGesture = false
@@ -119,7 +116,6 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         annotationView.base = nil
         annotationView.document = AnnotationDocument()
         annotationView.isHidden = true
-        toolbar.isHidden = true
     }
 
     override func layout() {
@@ -154,7 +150,6 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
             handlesLayer.path = nil
             sizeLabel.isHidden = true
             annotationView.isHidden = true
-            toolbar.isHidden = true
             return
         }
 
@@ -194,20 +189,17 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         annotationView.document = state.document
         annotationView.selectedID = state.document.selectedID
         annotationView.isHidden = false
+    }
 
-        if state.showToolbar && m.phase == .idle {
-            toolbar.setState(tool: state.tool, color: state.color, width: state.width,
-                             canUndo: state.canUndo, canRedo: state.canRedo)
-            let size = toolbar.preferredSize
-            var tx = pr.minX, ty = pr.maxY + 10
-            if ty + size.height > bounds.height - 6 { ty = pr.minY - 10 - size.height }
-            if ty < 6 { ty = pr.maxY - 10 - size.height }
-            tx = min(max(tx, 6), bounds.width - size.width - 6)
-            toolbar.frame = CGRect(origin: CGPoint(x: tx, y: ty), size: size)
-            toolbar.isHidden = false
-        } else {
-            toolbar.isHidden = true
-        }
+    /// Desired toolbar frame in this view's flipped coordinates, or nil to hide it.
+    func toolbarRect(for selection: SelectionModel, size: CGSize) -> CGRect? {
+        guard let r = selection.rect, !r.isEmpty, selection.phase == .idle else { return nil }
+        let pr = geometry.rect(fromPixelRect: r)
+        var tx = pr.minX, ty = pr.maxY + 10
+        if ty + size.height > bounds.height - 6 { ty = pr.minY - 10 - size.height }
+        if ty < 6 { ty = pr.maxY - 10 - size.height }
+        tx = min(max(tx, 6), bounds.width - size.width - 6)
+        return CGRect(x: tx, y: ty, width: size.width, height: size.height)
     }
 
     // MARK: Text editing
@@ -222,7 +214,7 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         let tv = AnnotationTextView.make(at: origin, maxWidth: maxWidth, font: font, color: color)
         tv.onCommit = { [weak self] in self?.commitTextEditing() }
         tv.onCancel = { [weak self] in self?.cancelTextEditing() }
-        addSubview(tv, positioned: .below, relativeTo: toolbar)
+        addSubview(tv)
         textEditor = tv
         textEditorPixelOrigin = pixel
         window?.makeFirstResponder(tv)
@@ -249,7 +241,6 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
 
     func gestureRecognizer(_ gestureRecognizer: NSGestureRecognizer, shouldAttemptToRecognizeWith event: NSEvent) -> Bool {
         let p = convert(event.locationInWindow, from: nil)
-        if !toolbar.isHidden, toolbar.frame.contains(p) { return false }
         if let tv = textEditor, tv.frame.contains(p) { return false }
         return true
     }

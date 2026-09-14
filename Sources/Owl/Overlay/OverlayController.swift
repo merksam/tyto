@@ -43,6 +43,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     private let capturer: ScreenCapturer
     private var windows: [CGDirectDisplayID: OverlayWindow] = [:]
+    private let toolbarPanel = ToolbarPanel()
     private(set) var session: Session?
     private(set) var lastTimings = CaptureTimings()
     var onSessionEnd: ((SessionOutcome) -> Void)?
@@ -53,6 +54,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     init(capturer: ScreenCapturer) {
         self.capturer = capturer
+        toolbarPanel.annotationToolbar.delegate = self
     }
 
     var isActive: Bool { session != nil }
@@ -86,7 +88,6 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             window.setFrame(snap.screenFrame, display: false)
             window.selectionView.frame = CGRect(origin: .zero, size: snap.screenFrame.size)
             window.selectionView.configure(snapshot: snap, delegate: self)
-            window.selectionView.toolbar.delegate = self
             window.selectionView.annotationView.drawsSelectionChrome = true
             window.selectionView.render(SelectionView.RenderState())
             window.orderFrontRegardless()
@@ -151,6 +152,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     private func end(_ outcome: SessionOutcome) {
         guard let s = session else { return }
+        toolbarPanel.orderOut(nil)
         for id in s.order {
             guard let w = windows[id] else { continue }
             w.orderOut(nil)
@@ -406,11 +408,43 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         for id in s.order {
             windows[id]?.selectionView.render(renderState(for: id, session: s))
         }
+        updateToolbarPanel(session: s)
     }
 
     private func renderActive() {
         guard let s = session, let id = s.activeDisplay else { return }
         windows[id]?.selectionView.render(renderState(for: id, session: s))
+        updateToolbarPanel(session: s)
+    }
+
+    /// Positions the floating toolbar panel over the active display's selection, or hides it.
+    private func updateToolbarPanel(session s: Session) {
+        guard s.options.interactive else { return }
+        guard let id = s.activeDisplay, let window = windows[id], let selection = s.selection else {
+            toolbarPanel.orderOut(nil)
+            return
+        }
+        toolbarPanel.annotationToolbar.setState(tool: tool, color: color, width: width,
+                                      canUndo: s.history.canUndo, canRedo: s.history.canRedo)
+        toolbarPanel.layoutToolbar()
+        let size = toolbarPanel.preferredSize
+        let view = window.selectionView
+        guard let rect = view.toolbarRect(for: selection, size: size) else {
+            toolbarPanel.orderOut(nil)
+            return
+        }
+        // rect.origin is the toolbar's top-left in the flipped view; convert it to a screen point.
+        let winPoint = view.convert(CGPoint(x: rect.minX, y: rect.minY), to: nil)
+        let screenTopLeft = window.convertPoint(toScreen: winPoint)
+        let frame = CGRect(x: screenTopLeft.x, y: screenTopLeft.y - size.height, width: size.width, height: size.height)
+        toolbarPanel.level = window.level
+        toolbarPanel.setFrame(frame, display: true)
+        toolbarPanel.orderFrontRegardless()
+    }
+
+    func testClickToolSegment(_ index: Int) throws {
+        guard session != nil else { throw OwlError.noSession }
+        toolbarPanel.annotationToolbar.testClickTool(index)
     }
 
     // MARK: SelectionViewDelegate
