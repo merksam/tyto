@@ -36,9 +36,9 @@ final class ToolbarView: NSView {
         configureSegments()
 
         Self.configureIconButton(undoButton, symbol: "arrow.uturn.backward", tip: "Undo (⌘Z)")
-        undoButton.addTarget(self, action: #selector(undoTapped), for: .primaryActionTriggered)
+        undoButton.target = self; undoButton.action = #selector(undoTapped)
         Self.configureIconButton(redoButton, symbol: "arrow.uturn.forward", tip: "Redo (⇧⌘Z)")
-        redoButton.addTarget(self, action: #selector(redoTapped), for: .primaryActionTriggered)
+        redoButton.target = self; redoButton.action = #selector(redoTapped)
 
         copyButton.title = "Copy"
         copyButton.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Copy")
@@ -46,13 +46,13 @@ final class ToolbarView: NSView {
         copyButton.bezelStyle = .glass
         copyButton.controlSize = .large
         copyButton.toolTip = "Copy to clipboard (⏎ or ⌘C)"
-        copyButton.addTarget(self, action: #selector(copyTapped), for: .primaryActionTriggered)
+        copyButton.target = self; copyButton.action = #selector(copyTapped)
 
         cancelButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Cancel")
         cancelButton.bezelStyle = .glass
         cancelButton.controlSize = .large
         cancelButton.toolTip = "Cancel (Esc)"
-        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .primaryActionTriggered)
+        cancelButton.target = self; cancelButton.action = #selector(cancelTapped)
 
         stack.orientation = .horizontal
         stack.alignment = .centerY
@@ -102,7 +102,7 @@ final class ToolbarView: NSView {
         }
         tools.trackingMode = .selectOne
         tools.controlSize = .large
-        tools.addTarget(self, action: #selector(toolChanged), for: .valueChanged)
+        tools.target = self; tools.action = #selector(toolChanged)
 
         colors.segmentCount = RGBAColor.palette.count
         for (i, entry) in RGBAColor.palette.enumerated() {
@@ -112,7 +112,7 @@ final class ToolbarView: NSView {
         }
         colors.trackingMode = .selectOne
         colors.controlSize = .large
-        colors.addTarget(self, action: #selector(colorChanged), for: .valueChanged)
+        colors.target = self; colors.action = #selector(colorChanged)
 
         widths.segmentCount = WidthPreset.allCases.count
         for (i, w) in WidthPreset.allCases.enumerated() {
@@ -124,7 +124,7 @@ final class ToolbarView: NSView {
         }
         widths.trackingMode = .selectOne
         widths.controlSize = .large
-        widths.addTarget(self, action: #selector(widthChanged), for: .valueChanged)
+        widths.target = self; widths.action = #selector(widthChanged)
     }
 
     private static func configureIconButton(_ b: NSButton, symbol: String, tip: String) {

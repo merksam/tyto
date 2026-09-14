@@ -55,3 +55,6 @@ q clipboard "$OUT/e2e3-4-clipboard.png"
 step "downscaled previews"
 for f in "$OUT"/e2e3-*.png; do sips -Z 1600 "$f" --out "${f%.png}-small.png" >/dev/null; done
 ls -la "$OUT"/e2e3-*.png
+
+# Leave the editor in a sane state for the next real capture.
+"$CTL" tool rect >/dev/null
