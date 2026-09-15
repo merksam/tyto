@@ -24,6 +24,7 @@ enum DebugCommands {
                 "version": .string(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"),
                 "screenCapturePermission": .bool(Permissions.hasScreenCapture),
                 "sessionActive": .bool(overlay.isActive),
+                "settingsWindowVisible": .bool(app.isSettingsWindowVisible),
             ])
 
         case "displays":
@@ -177,6 +178,7 @@ enum DebugCommands {
             let on = ["1", "true", "on", "yes"].contains(value.lowercased())
             switch key {
             case "copyAsFile": Settings.copyAsFile = on
+            case "hasLaunchedBefore": UserDefaults.standard.set(on, forKey: AppDelegate.hasLaunchedBeforeKey)
             case "autoSave": Settings.autoSaveRecent = on
             case "saveDir": try Settings.setSaveDirectory(value == "default" ? nil : URL(fileURLWithPath: value, isDirectory: true))
             case "defaultTool":

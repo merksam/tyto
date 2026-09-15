@@ -62,6 +62,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    var isSettingsWindowVisible: Bool { settingsWindowController?.isVisible ?? false }
+
     func openSettings() {
         if settingsWindowController == nil { settingsWindowController = SettingsWindowController() }
         settingsWindowController?.show()
