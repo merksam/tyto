@@ -58,10 +58,11 @@ enum DebugCommands {
             ])
 
         case "export":
-            guard let path = req.path else { throw OwlError.badRequest("export needs a path") }
+            // Returns the composite as base64 PNG; owlctl writes the file (the app is sandboxed).
             let (rect, image) = try overlay.exportImage()
-            try PNGEncoder.write(image, to: URL(fileURLWithPath: path))
-            return .success(["path": .string(path), "rect": rectJSON(rect),
+            let png = try PNGEncoder.data(image)
+            return .success(["png": pngPayload(png), "rect": rectJSON(rect),
+                             "bytes": JSONValue(png.count),
                              "width": JSONValue(image.width), "height": JSONValue(image.height)])
 
         case "cancel":
@@ -211,19 +212,25 @@ enum DebugCommands {
                              "recentCount": JSONValue(CaptureHistory.recent.count)])
 
         case "snapshot":
-            guard let path = req.path else { throw OwlError.badRequest("snapshot needs a path") }
+            // Returns the display as base64 PNG; owlctl writes the file (the app is sandboxed).
             let id = try resolveSingle(req.display ?? "main", capturer: capturer)
             guard let display = capturer.displays().first(where: { $0.id == id }) else {
                 throw OwlError.unknownDisplay("\(id)")
             }
-            try await capturer.writeDisplayPNG(display: display, to: URL(fileURLWithPath: path))
-            return .success(["path": .string(path), "display": JSONValue(Int(id))])
+            let png = try await capturer.displayPNG(display: display)
+            var data: [String: JSONValue] = ["png": pngPayload(png),
+                                             "bytes": JSONValue(png.count),
+                                             "display": JSONValue(Int(id))]
+            if let size = PNGEncoder.size(ofPNG: png) {
+                data["width"] = JSONValue(size.width)
+                data["height"] = JSONValue(size.height)
+            }
+            return .success(data)
 
         case "clipboard":
-            guard let path = req.path else { throw OwlError.badRequest("clipboard needs a path") }
+            // Returns the clipboard image as base64 PNG; owlctl writes the file (the app is sandboxed).
             guard let png = Clipboard.readPNG() else { throw OwlError.clipboardEmpty }
-            try png.write(to: URL(fileURLWithPath: path), options: .atomic)
-            var data: [String: JSONValue] = ["path": .string(path), "bytes": JSONValue(png.count)]
+            var data: [String: JSONValue] = ["png": pngPayload(png), "bytes": JSONValue(png.count)]
             if let size = PNGEncoder.size(ofPNG: png) {
                 data["width"] = JSONValue(size.width)
                 data["height"] = JSONValue(size.height)
@@ -245,6 +252,11 @@ enum DebugCommands {
     }
 
     // MARK: helpers
+
+    /// PNG payload for the harness. The sandboxed app cannot write to caller-chosen paths, and
+    /// other processes cannot read its container (TCC-protected), so the bytes go over the socket
+    /// and owlctl writes the file.
+    private static func pngPayload(_ data: Data) -> JSONValue { .string(data.base64EncodedString()) }
 
     private static func activeDisplay(_ overlay: OverlayController, _ spec: String?, capturer: ScreenCapturer) throws -> CGDirectDisplayID {
         if let spec { return try resolveSingle(spec, capturer: capturer) }

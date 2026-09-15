@@ -86,10 +86,11 @@ final class ScreenCapturer {
         return snapshots.sorted { (order.firstIndex(of: $0.displayID) ?? 0) < (order.firstIndex(of: $1.displayID) ?? 0) }
     }
 
-    /// Test harness: writes a PNG of one display as it currently looks, including Owl's own windows.
-    func writeDisplayPNG(display: DisplayInfo, to url: URL) async throws {
+    /// Test harness: PNG bytes of one display as it currently looks, including Owl's own windows.
+    /// Returned as data (not written) because a sandboxed app cannot write to caller-chosen paths.
+    func displayPNG(display: DisplayInfo) async throws -> Data {
         let snap = try await Self.captureOne(display)
-        try PNGEncoder.write(snap.image, to: url)
+        return try PNGEncoder.data(snap.image)
     }
 
     nonisolated static func captureOne(_ d: DisplayInfo) async throws -> DisplaySnapshot {

@@ -132,19 +132,41 @@ while sent < payload.count {
     sent += n
 }
 
+// Read until the terminating newline. Only the freshly appended bytes are scanned: rescanning
+// the whole buffer each time is quadratic and crawls on multi-megabyte image payloads.
 var response = Data()
-var chunk = [UInt8](repeating: 0, count: 65536)
-while !response.contains(0x0A) {
+var chunk = [UInt8](repeating: 0, count: 1 << 20)
+var searchFrom = 0
+var newlineIndex: Int?
+while newlineIndex == nil {
     let n = read(fd, &chunk, chunk.count)
     guard n > 0 else { die("connection closed before a response arrived (timeout 60s)") }
     response.append(contentsOf: chunk[0..<n])
+    if let idx = response[searchFrom...].firstIndex(of: 0x0A) { newlineIndex = idx }
+    else { searchFrom = response.count }
 }
 close(fd)
 
-let line = response.prefix { $0 != 0x0A }
-guard let decoded = try? JSONDecoder().decode(DebugResponse.self, from: Data(line)) else {
+let line = response.prefix(upTo: newlineIndex!)
+guard var decoded = try? JSONDecoder().decode(DebugResponse.self, from: Data(line)) else {
     die("unparseable response: \(String(decoding: line, as: UTF8.self))")
 }
+
+// Image-returning commands send the PNG as base64: the sandboxed app cannot write to
+// caller-chosen paths, and its container is not readable by other processes. Write it here.
+if decoded.ok, case .string(let b64)? = decoded.data["png"] {
+    guard let outPath = request.path else { die("\(cmd) produced an image but no output PATH was given") }
+    guard let bytes = Data(base64Encoded: b64) else { die("\(cmd): response PNG was not valid base64") }
+    do {
+        let dst = URL(fileURLWithPath: outPath)
+        try? FileManager.default.createDirectory(at: dst.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try bytes.write(to: dst, options: .atomic)
+    } catch { die("\(cmd): could not write \(outPath): \(error)") }
+    decoded.data["png"] = nil
+    decoded.data["path"] = .string(outPath)
+    decoded.data["bytes"] = JSONValue(bytes.count)
+}
+
 let pretty = JSONEncoder()
 pretty.outputFormatting = [.prettyPrinted, .sortedKeys]
 print(String(decoding: try! pretty.encode(decoded), as: UTF8.self))

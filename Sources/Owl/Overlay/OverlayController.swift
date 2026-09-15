@@ -47,6 +47,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     private let capturer: ScreenCapturer
     private var windows: [CGDirectDisplayID: OverlayWindow] = [:]
     private let toolbarPanel = ToolbarPanel()
+    private var sessionSerial = 0
     private(set) var session: Session?
     private(set) var lastTimings = CaptureTimings()
     var onSessionEnd: ((SessionOutcome) -> Void)?
@@ -92,6 +93,9 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             let window = windows[snap.displayID] ?? OverlayWindow(screenFrame: snap.screenFrame)
             windows[snap.displayID] = window
             window.allowsKey = options.interactive
+            // Test mode never takes key focus, so Esc cannot reach it; make sure it also cannot
+            // swallow clicks, otherwise a leftover overlay looks like a frozen screen.
+            window.ignoresMouseEvents = !options.interactive
             window.setFrame(snap.screenFrame, display: false)
             window.selectionView.frame = CGRect(origin: .zero, size: snap.screenFrame.size)
             window.selectionView.configure(snapshot: snap, delegate: self)
@@ -117,6 +121,18 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             if let keyWindow { keyWindow.makeFirstResponder(keyWindow.selectionView) }
             NSCursor.crosshair.push()
             session?.cursorPushed = true
+        }
+
+        sessionSerial += 1
+        if !options.interactive {
+            // Safety net: if a harness run dies mid-session, don't leave the screen covered.
+            let serial = sessionSerial
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(30))
+                guard let self, self.session != nil, self.sessionSerial == serial else { return }
+                Log.overlay.error("test-mode session auto-cancelled after 30s")
+                self.cancel()
+            }
         }
 
         for id in s.order { windows[id]?.displayIfNeeded() }

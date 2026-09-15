@@ -9,6 +9,8 @@ OUT="$ROOT/out"
 mkdir -p "$OUT"
 rm -f "$OUT"/e2e3-*.png
 
+trap '"$CTL" cancel >/dev/null 2>&1 || true' EXIT
+
 step() { echo "== $*" 1>&2; }
 q() { "$CTL" "$@" >/dev/null; }
 
