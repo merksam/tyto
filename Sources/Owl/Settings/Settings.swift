@@ -17,7 +17,7 @@ enum Settings {
     // MARK: Drawing defaults (applied at the start of every capture)
 
     static var defaultTool: Tool {
-        get { d.string(forKey: "defaultTool").flatMap(Tool.init(rawValue:)) ?? .rect }
+        get { d.string(forKey: "defaultTool").flatMap(Tool.init(rawValue:)) ?? .arrow }
         set { d.set(newValue.rawValue, forKey: "defaultTool") }
     }
 
@@ -27,7 +27,7 @@ enum Settings {
     }
 
     static var defaultWidth: WidthPreset {
-        get { d.string(forKey: "defaultWidth").flatMap(WidthPreset.init(rawValue:)) ?? .medium }
+        get { d.string(forKey: "defaultWidth").flatMap(WidthPreset.init(rawValue:)) ?? .thin }
         set { d.set(newValue.rawValue, forKey: "defaultWidth") }
     }
 

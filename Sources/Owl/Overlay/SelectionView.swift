@@ -239,12 +239,13 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
 
     var isEditingText: Bool { textEditor != nil }
 
-    func beginTextEditing(at pixel: PixelPoint, maxPixelX: Int, fontPoints: CGFloat, color: NSColor) {
+    func beginTextEditing(at pixel: PixelPoint, maxPixelX: Int, fontPoints: CGFloat, color: RGBAColor) {
         cancelTextEditing()
         let origin = geometry.point(fromPixel: pixel)
         let maxWidth = max(40, CGFloat(maxPixelX - pixel.x) / geometry.scale)
         let font = NSFont.boldSystemFont(ofSize: fontPoints)
-        let tv = AnnotationTextView.make(at: origin, maxWidth: maxWidth, font: font, color: color)
+        let tv = AnnotationTextView.make(at: origin, maxWidth: maxWidth, font: font,
+                                         color: color.nsColor, haloSource: color)
         tv.onCommit = { [weak self] in self?.commitTextEditing() }
         tv.onCancel = { [weak self] in self?.cancelTextEditing() }
         addSubview(tv)

@@ -479,7 +479,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             session = s
             renderAll()
             if s.options.interactive, let v = windows[displayID]?.selectionView, let rect = model.rect {
-                v.beginTextEditing(at: p, maxPixelX: rect.maxX, fontPoints: width.fontPoints, color: color.nsColor)
+                v.beginTextEditing(at: p, maxPixelX: rect.maxX, fontPoints: width.fontPoints, color: color)
             }
             return
         case .badge:

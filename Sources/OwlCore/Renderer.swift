@@ -151,36 +151,56 @@ public enum AnnotationRenderer {
         drawText("\(s.number)", at: origin, fontSize: fontSize, color: textColor, outlined: false, into: ctx)
     }
 
+    /// Contrasting halo colour for text of this colour, used for legibility on any background.
+    public static func haloColor(for color: RGBAColor) -> CGColor {
+        color.luminance < 0.35
+            ? CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.9)
+            : CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.85)
+    }
+
+    /// Halo blur radius for a given font size, shared with the inline editor so typing and the
+    /// committed shape look identical.
+    public static func haloBlur(fontSize: Double) -> Double { fontSize * 0.12 }
+
+    /// Left/top inset of the glyphs inside a text shape's bounds; leaves room for the halo.
+    public static func textPadding(fontSize: Double) -> Double { ceil(fontSize * 0.08) }
+
     static func drawText(_ text: String, at origin: PixelPoint, fontSize: Double, color: RGBAColor,
                          outlined: Bool, into ctx: CGContext) {
         let f = font(size: fontSize)
         let ascent = CTFontGetAscent(f)
         let lh = CGFloat(lineHeight(fontSize: fontSize))
-        let pad = CGFloat(ceil(fontSize * 0.08))
-        var attrs: [NSAttributedString.Key: Any] = [
+        let pad = CGFloat(textPadding(fontSize: fontSize))
+        let attrs: [NSAttributedString.Key: Any] = [
             .init(kCTFontAttributeName as String): f,
             .init(kCTForegroundColorAttributeName as String): color.cgColor,
         ]
-        if outlined {
-            let outline: CGColor = color.luminance < 0.35
-                ? CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.9)
-                : CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.85)
-            // Negative stroke width = fill and stroke; magnitude is a percentage of the font size.
-            attrs[.init(kCTStrokeWidthAttributeName as String)] = -5.0
-            attrs[.init(kCTStrokeColorAttributeName as String)] = outline
-        }
         ctx.saveGState()
         defer { ctx.restoreGState() }
-        ctx.setLineJoin(.round)
         // The context is flipped; flip the text matrix back so glyphs render upright.
         ctx.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
-        for (i, line) in text.components(separatedBy: "\n").enumerated() {
-            let attributed = NSAttributedString(string: line.isEmpty ? " " : line, attributes: attrs)
-            let ctLine = CTLineCreateWithAttributedString(attributed)
-            ctx.textPosition = CGPoint(x: CGFloat(origin.x) + pad,
-                                       y: CGFloat(origin.y) + pad + ascent + CGFloat(i) * lh)
-            CTLineDraw(ctLine, ctx)
+
+        let lines = text.components(separatedBy: "\n")
+        func drawLines() {
+            for (i, line) in lines.enumerated() {
+                let attributed = NSAttributedString(string: line.isEmpty ? " " : line, attributes: attrs)
+                let ctLine = CTLineCreateWithAttributedString(attributed)
+                ctx.textPosition = CGPoint(x: CGFloat(origin.x) + pad,
+                                           y: CGFloat(origin.y) + pad + ascent + CGFloat(i) * lh)
+                CTLineDraw(ctLine, ctx)
+            }
         }
+
+        if outlined {
+            // A halo rather than a stroked outline: a stroke thickens the glyphs (so text looked
+            // heavier once committed) and closes the counters of e/a/o into blobs. The halo leaves
+            // glyph weight untouched. Drawn twice for density, then once more clean on top.
+            ctx.setShadow(offset: .zero, blur: CGFloat(haloBlur(fontSize: fontSize)), color: haloColor(for: color))
+            drawLines()
+            drawLines()
+            ctx.setShadow(offset: .zero, blur: 0, color: nil)
+        }
+        drawLines()
     }
 
     /// Mosaic: average the region down to `block`-sized cells, then scale back up with no interpolation.
