@@ -1,0 +1,83 @@
+# Generates Owl.xcodeproj (git-ignored). Regenerate with scripts/gen-project.sh.
+# The SwiftPM package stays the source of truth for OwlCore, owlctl and the tests;
+# this project exists so the app can be archived and uploaded to the Mac App Store,
+# which a SwiftPM-only build cannot do.
+name: Owl
+options:
+  bundleIdPrefix: com.owl
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: UH3Q794XYK
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_HARDENED_RUNTIME: YES
+    ARCHS: arm64
+    MACOSX_DEPLOYMENT_TARGET: "27.0"
+
+targets:
+  # OwlCore is compiled as its own target rather than pulled in through the SwiftPM package:
+  # Xcode cannot resolve a local package whose path is the project's own directory. The same
+  # sources still build as a SwiftPM library for `swift build`, `swift test` and owlctl.
+  OwlCore:
+    # Static library, not a framework: nothing to embed, sign or version, and the Swift module
+    # is importable all the same. Matches SwiftPM, where OwlCore is a plain library.
+    type: library.static
+    platform: macOS
+    sources:
+      - path: Sources/OwlCore
+    settings:
+      base:
+        PRODUCT_NAME: OwlCore
+        PRODUCT_MODULE_NAME: OwlCore
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+        SKIP_INSTALL: YES
+
+  Owl:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Owl
+    dependencies:
+      - target: OwlCore
+      - sdk: ScreenCaptureKit.framework
+      - sdk: Carbon.framework
+      - sdk: ServiceManagement.framework
+    settings:
+      base:
+        PRODUCT_NAME: Owl
+        PRODUCT_MODULE_NAME: Owl
+        PRODUCT_BUNDLE_IDENTIFIER: com.owl.app
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Resources/Owl.entitlements
+        # Matches the SwiftPM target's .defaultIsolation(MainActor.self)
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        COMBINE_HIDPI_IMAGES: YES
+      configs:
+        Debug:
+          # Same identity as scripts/build-app.sh so the Screen Recording grant
+          # (keyed on the designated requirement) survives switching build systems.
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          PROVISIONING_PROFILE_SPECIFIER: ""
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Release:
+          CODE_SIGN_STYLE: Automatic
+
+schemes:
+  # Named OwlApp, not Owl: the package also vends an `Owl` executable product, and two schemes
+  # with the same name make `xcodebuild -scheme Owl` ambiguous. The product is still Owl.app.
+  OwlApp:
+    build:
+      targets:
+        Owl: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+      revealArchiveInOrganizer: false

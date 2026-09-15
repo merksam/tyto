@@ -4,3 +4,5 @@ build/
 *.app
 .DS_Store
 out/
+Owl.xcodeproj/
+*.xcarchive
