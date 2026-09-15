@@ -1,3 +1,4 @@
+#if DEBUG
 import Darwin
 import Foundation
 import OwlCore
@@ -11,17 +12,9 @@ final class DebugCommandRouter {
     }
 }
 
-/// Newline-delimited JSON over a unix domain socket. Debug builds only (or OWL_DEBUG=1).
+/// Newline-delimited JSON over a unix domain socket. Compiled into Debug builds only.
 /// Runs entirely off the main actor; each request is dispatched to the router on the main actor.
 nonisolated final class DebugServer: @unchecked Sendable {
-    static var isEnabled: Bool {
-        #if DEBUG
-        return true
-        #else
-        return ProcessInfo.processInfo.environment["OWL_DEBUG"] != nil
-        #endif
-    }
-
     private let path: String
     private let router: DebugCommandRouter
     private let queue = DispatchQueue(label: "com.owl.app.debug-socket")
@@ -167,3 +160,4 @@ nonisolated private final class Connection: @unchecked Sendable {
         }
     }
 }
+#endif

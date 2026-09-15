@@ -1,3 +1,4 @@
+#if DEBUG
 import AppKit
 import CoreGraphics
 import Foundation
@@ -349,3 +350,4 @@ enum DebugCommands {
         return d
     }
 }
+#endif

@@ -77,9 +77,25 @@ public enum JSONValue: Codable, Sendable, Equatable {
 }
 
 public enum DebugSocket {
-    /// Shared by the app and owlctl. Overridable with OWL_DEBUG_SOCKET.
+    public static let bundleID = "com.owl.app"
+
+    /// `~/Library/Containers/com.owl.app/Data`, built from the passwd home rather than
+    /// `NSHomeDirectory()`: inside the sandbox `$HOME` already *is* this directory, while
+    /// `owlctl` runs unsandboxed. Computing it from the real home gives the same answer on
+    /// both sides, so the app can bind the socket in its container and owlctl can find it.
+    public static var containerDataDirectory: String {
+        realHomeDirectory() + "/Library/Containers/" + bundleID + "/Data"
+    }
+
+    /// Overridable with OWL_DEBUG_SOCKET (must point inside the container for a sandboxed app
+    /// to be able to bind it). ~70 bytes here; sockaddr_un allows 104.
     public static var path: String {
         if let p = ProcessInfo.processInfo.environment["OWL_DEBUG_SOCKET"], !p.isEmpty { return p }
-        return NSHomeDirectory() + "/Library/Application Support/Owl/debug.sock"
+        return containerDataDirectory + "/tmp/owl-debug.sock"
+    }
+
+    static func realHomeDirectory() -> String {
+        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir { return String(cString: dir) }
+        return NSHomeDirectory()
     }
 }

@@ -24,13 +24,30 @@ if [ -z "$IDENTITY" ]; then
   IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
     | /usr/bin/grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"' || true)"
 fi
+
+# Every build is sandboxed (Mac App Store posture). SANDBOX=0 is a bisecting escape hatch only.
+ENTITLEMENTS="$ROOT/Resources/Owl.entitlements"
+ENT_ARGS=(--entitlements "$ENTITLEMENTS")
+if [ "${SANDBOX:-1}" = "0" ]; then
+  ENT_ARGS=()
+  echo "SANDBOX=0: signing WITHOUT entitlements (not the shipping posture)" 1>&2
+fi
+
 if [ -n "$IDENTITY" ]; then
   codesign --force --sign "$IDENTITY" --options runtime --timestamp=none \
-    --identifier "$BUNDLE_ID" "$APP" 1>&2
+    --identifier "$BUNDLE_ID" ${ENT_ARGS[@]+"${ENT_ARGS[@]}"} "$APP" 1>&2
   echo "signed with: $IDENTITY" 1>&2
 else
-  codesign --force --sign - --identifier "$BUNDLE_ID" "$APP" 1>&2
+  codesign --force --sign - --identifier "$BUNDLE_ID" ${ENT_ARGS[@]+"${ENT_ARGS[@]}"} "$APP" 1>&2
   echo "signed ad-hoc (Screen Recording grant will not survive rebuilds)" 1>&2
 fi
 codesign --verify --verbose=2 "$APP" 1>&2
+if [ "${SANDBOX:-1}" != "0" ]; then
+  if codesign -d --entitlements - "$APP" 2>&1 | grep -q "com.apple.security.app-sandbox"; then
+    echo "sandboxed: yes" 1>&2
+  else
+    echo "error: build is not sandboxed" 1>&2
+    exit 1
+  fi
+fi
 echo "$APP"

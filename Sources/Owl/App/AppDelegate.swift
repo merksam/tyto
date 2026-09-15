@@ -5,7 +5,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenu: StatusMenu?
     private var hotkey: GlobalHotkey?
     private var settingsWindowController: SettingsWindowController?
+    #if DEBUG
     private var debugServer: DebugServer?
+    #endif
     let capturer = ScreenCapturer()
     private(set) var overlay: OverlayController!
 
@@ -20,17 +22,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(hotkeyChanged),
                                                name: Settings.hotkeyChanged, object: nil)
 
-        if DebugServer.isEnabled {
+        #if DEBUG
+        do {
             let router = DebugCommandRouter(app: self)
             let server = DebugServer(path: DebugSocket.path, router: router)
-            do {
-                try server.start()
-                debugServer = server
-                Log.debug.info("debug socket listening at \(DebugSocket.path)")
-            } catch {
-                Log.debug.error("debug socket failed: \(String(describing: error))")
-            }
+            try server.start()
+            debugServer = server
+            Log.debug.info("debug socket listening at \(DebugSocket.path)")
+        } catch {
+            Log.debug.error("debug socket failed: \(String(describing: error))")
         }
+        #endif
 
         if !Permissions.hasScreenCapture {
             Log.app.notice("Screen Recording not granted; requesting")
@@ -40,7 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        #if DEBUG
         debugServer?.stop()
+        #endif
         hotkey?.unregister()
     }
 

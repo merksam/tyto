@@ -34,8 +34,10 @@ usage: owlctl <command> [options]
   settings                              print current settings
   recent                                list recent captures
 
+  container                             print the app's sandbox container Data directory (local, no socket)
+
 SPEC: all | main | secondary | <CGDirectDisplayID>     (default: all for capture, main otherwise)
-Socket: $OWL_DEBUG_SOCKET or ~/Library/Application Support/Owl/debug.sock
+Socket: $OWL_DEBUG_SOCKET or ~/Library/Containers/com.owl.app/Data/tmp/owl-debug.sock
 """
 
 func die(_ message: String, code: Int32 = 2) -> Never {
@@ -46,6 +48,7 @@ func die(_ message: String, code: Int32 = 2) -> Never {
 var args = Array(CommandLine.arguments.dropFirst())
 guard let cmd = args.first else { die(usage) }
 if cmd == "--help" || cmd == "-h" { print(usage); exit(0) }
+if cmd == "container" { print(DebugSocket.containerDataDirectory); exit(0) }
 args.removeFirst()
 
 var request = DebugRequest(cmd: cmd)
