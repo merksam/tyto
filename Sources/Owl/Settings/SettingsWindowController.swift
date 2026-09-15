@@ -5,6 +5,8 @@ import SwiftUI
 @MainActor final class SettingsWindowController {
     private var window: NSWindow?
 
+    var isVisible: Bool { window?.isVisible ?? false }
+
     func show() {
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView())

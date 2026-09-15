@@ -178,7 +178,7 @@ enum DebugCommands {
             switch key {
             case "copyAsFile": Settings.copyAsFile = on
             case "autoSave": Settings.autoSaveRecent = on
-            case "saveDir": Settings.saveDirectory = URL(fileURLWithPath: value, isDirectory: true)
+            case "saveDir": try Settings.setSaveDirectory(value == "default" ? nil : URL(fileURLWithPath: value, isDirectory: true))
             case "defaultTool":
                 guard let t = Tool(rawValue: value) else { throw OwlError.badRequest("bad tool") }
                 Settings.defaultTool = t
@@ -305,7 +305,11 @@ enum DebugCommands {
         [
             "copyAsFile": .bool(Settings.copyAsFile),
             "autoSaveRecent": .bool(Settings.autoSaveRecent),
-            "saveDirectory": .string(Settings.saveDirectory.path),
+            "saveDirectory": .string(Settings.saveDirectoryDisplayPath),
+            "saveDirectoryIsCustom": .bool(Settings.hasCustomSaveDirectory),
+            "saveDirectoryWritable": .bool(Settings.withSaveDirectoryAccess {
+                FileManager.default.isWritableFile(atPath: $0.path)
+            }),
             "defaultTool": .string(Settings.defaultTool.rawValue),
             "defaultColor": .string(Settings.defaultColor.name ?? "custom"),
             "defaultWidth": .string(Settings.defaultWidth.rawValue),

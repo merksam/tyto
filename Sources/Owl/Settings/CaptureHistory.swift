@@ -10,24 +10,29 @@ enum CaptureHistory {
     @discardableResult
     static func record(_ image: CGImage) -> URL? {
         guard Settings.autoSaveRecent else { return nil }
-        let dir = Settings.saveDirectory
-        do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let url = Self.uniqueURL(in: dir, name: OverlayController.timestampedName())
-            try PNGEncoder.write(image, to: url)
-            prepend(url)
-            Log.app.info("auto-saved capture to \(url.lastPathComponent)")
-            return url
-        } catch {
-            Log.app.error("auto-save failed: \(String(describing: error))")
-            return nil
+        // Directory creation, the uniqueness probes and the write all need the security scope.
+        return Settings.withSaveDirectoryAccess { dir -> URL? in
+            do {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let url = Self.uniqueURL(in: dir, name: OverlayController.timestampedName())
+                try PNGEncoder.write(image, to: url)
+                prepend(url)
+                Log.app.info("auto-saved capture to \(url.lastPathComponent)")
+                return url
+            } catch {
+                Log.app.error("auto-save failed: \(String(describing: error))")
+                return nil
+            }
         }
     }
 
     /// Most-recent-first, filtered to files that still exist on disk.
     static var recent: [URL] {
         let paths = UserDefaults.standard.stringArray(forKey: key) ?? []
-        return paths.map { URL(fileURLWithPath: $0) }.filter { FileManager.default.fileExists(atPath: $0.path) }
+        // fileExists returns false for paths the sandbox cannot reach, so probe inside the scope.
+        return Settings.withSaveDirectoryAccess { _ in
+            paths.map { URL(fileURLWithPath: $0) }.filter { FileManager.default.fileExists(atPath: $0.path) }
+        }
     }
 
     /// Records an already-written file (e.g. a Cmd+S save) in the recent list without copying it.

@@ -13,7 +13,11 @@ import SwiftUI
     @Published var autoSaveRecent = Settings.autoSaveRecent { didSet { Settings.autoSaveRecent = autoSaveRecent } }
     @Published var copyAsFile = Settings.copyAsFile { didSet { Settings.copyAsFile = copyAsFile } }
     @Published var launchAtLogin = Settings.launchAtLogin { didSet { Settings.launchAtLogin = launchAtLogin } }
-    @Published var saveDirectory = Settings.saveDirectory.path
+    @Published var screenCaptureGranted = Permissions.hasScreenCapture
+    @Published var saveDirectory = Settings.saveDirectoryDisplayPath
+    @Published var hasCustomSaveDirectory = Settings.hasCustomSaveDirectory
+
+    func refreshPermissionState() { screenCaptureGranted = Permissions.hasScreenCapture }
 
     func chooseSaveDirectory() {
         let panel = NSOpenPanel()
@@ -21,10 +25,25 @@ import SwiftUI
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.directoryURL = Settings.saveDirectory
-        if panel.runModal() == .OK, let url = panel.url {
-            Settings.saveDirectory = url
-            saveDirectory = url.path
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            // The panel result carries its own sandbox extension; bookmark it so the grant
+            // survives relaunches.
+            try Settings.setSaveDirectory(url)
+        } catch {
+            Log.app.error("could not use \(url.path) as the save folder: \(String(describing: error))")
         }
+        refreshSaveDirectory()
+    }
+
+    func useDefaultSaveDirectory() {
+        try? Settings.setSaveDirectory(nil)
+        refreshSaveDirectory()
+    }
+
+    private func refreshSaveDirectory() {
+        saveDirectory = Settings.saveDirectoryDisplayPath
+        hasCustomSaveDirectory = Settings.hasCustomSaveDirectory
     }
 }
 
@@ -33,6 +52,20 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("Permissions") {
+                LabeledContent("Screen Recording") {
+                    HStack {
+                        Text(model.screenCaptureGranted ? "Allowed" : "Not allowed")
+                            .foregroundStyle(model.screenCaptureGranted ? .secondary : Color.red)
+                        Button("Open System Settings…") { Permissions.openScreenCaptureSettings() }
+                    }
+                }
+                if !model.screenCaptureGranted {
+                    Text("Owl needs Screen Recording to capture the screen. Relaunch Owl after granting it.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            }
+
             Section("Shortcut") {
                 LabeledContent("Capture region") {
                     HotkeyRecorder(display: $model.hotkeyDisplay)
@@ -59,6 +92,9 @@ struct SettingsView: View {
                         Text(model.saveDirectory).lineLimit(1).truncationMode(.middle)
                             .foregroundStyle(.secondary)
                         Button("Choose…") { model.chooseSaveDirectory() }
+                        if model.hasCustomSaveDirectory {
+                            Button("Use Default") { model.useDefaultSaveDirectory() }
+                        }
                     }
                 }
                 Toggle("Also copy as a file (for Finder and file drop targets)", isOn: $model.copyAsFile)
@@ -69,6 +105,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.refreshPermissionState()
+        }
         .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
     }

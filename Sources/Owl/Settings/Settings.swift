@@ -39,15 +39,63 @@ enum Settings {
         set { d.set(newValue, forKey: "autoSaveRecent") }
     }
 
-    static var saveDirectory: URL {
-        get {
-            if let path = d.string(forKey: "saveDirectory"), !path.isEmpty {
-                return URL(fileURLWithPath: path, isDirectory: true)
-            }
-            return FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Owl", isDirectory: true)
+    /// Security-scoped bookmark of a user-chosen folder. A sandboxed app cannot keep access to a
+    /// folder across launches from a plain path, so the bookmark is the stored form.
+    private static let bookmarkKey = "saveDirectoryBookmark"
+
+    /// Always reachable: the container's Pictures symlink plus the pictures entitlement cover it.
+    static var defaultSaveDirectory: URL {
+        FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Owl", isDirectory: true)
+    }
+
+    /// The folder captures go to. Resolving a bookmark needs no access; wrap actual file work in
+    /// `withSaveDirectoryAccess`.
+    static var saveDirectory: URL { resolvedCustomDirectory()?.url ?? defaultSaveDirectory }
+
+    static var hasCustomSaveDirectory: Bool { d.data(forKey: bookmarkKey) != nil }
+
+    /// For display and JSON: the container's Pictures symlink resolved to its real path.
+    static var saveDirectoryDisplayPath: String { saveDirectory.resolvingSymlinksInPath().path }
+
+    /// Passing nil reverts to the default folder. Throws if the app cannot reach `url` (which is
+    /// the sandbox working as intended: only an open-panel result, ~/Pictures or the container
+    /// can be bookmarked).
+    static func setSaveDirectory(_ url: URL?) throws {
+        guard let url else { d.removeObject(forKey: bookmarkKey); return }
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        let data = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        d.set(data, forKey: bookmarkKey)
+    }
+
+    /// Brackets `body` with the security scope of the custom folder. The default folder is covered
+    /// by the pictures entitlement and needs no scope.
+    @discardableResult
+    static func withSaveDirectoryAccess<T>(_ body: (URL) throws -> T) rethrows -> T {
+        guard let resolved = resolvedCustomDirectory() else { return try body(defaultSaveDirectory) }
+        let granted = resolved.url.startAccessingSecurityScopedResource()
+        if !granted { Log.app.error("save folder: security scope not granted for \(resolved.url.path)") }
+        defer { if granted { resolved.url.stopAccessingSecurityScopedResource() } }
+        if resolved.stale, let fresh = try? resolved.url.bookmarkData(options: .withSecurityScope,
+                                                                     includingResourceValuesForKeys: nil, relativeTo: nil) {
+            d.set(fresh, forKey: bookmarkKey)  // refresh while access is held
         }
-        set { d.set(newValue.path, forKey: "saveDirectory") }
+        return try body(resolved.url)
+    }
+
+    /// Resolves a fresh URL each call so start/stop access always pair on the same object.
+    private static func resolvedCustomDirectory() -> (url: URL, stale: Bool)? {
+        guard let data = d.data(forKey: bookmarkKey) else { return nil }
+        var stale = false
+        do {
+            let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil,
+                              bookmarkDataIsStale: &stale)
+            return (url, stale)
+        } catch {
+            // Keep the bookmark: an unmounted volume is transient, and the user can re-choose.
+            Log.app.error("save folder bookmark unusable, using default: \(String(describing: error))")
+            return nil
+        }
     }
 
     // MARK: Global hotkey (Carbon key code + Carbon modifier mask)

@@ -196,13 +196,6 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         onSessionEnd?(outcome)
     }
 
-    static func defaultSaveDirectory() -> URL {
-        let dir = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Owl", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }
-
     static func timestampedName() -> String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
@@ -228,9 +221,14 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
-        let dir = Self.defaultSaveDirectory()
+        // Seed the panel from the configured folder; the URL it returns carries its own
+        // sandbox extension, so the write afterwards needs no scope of ours.
+        let (dir, name) = Settings.withSaveDirectoryAccess { dir -> (URL, String) in
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return (dir, CaptureHistory.uniqueURL(in: dir, name: Self.timestampedName()).lastPathComponent)
+        }
         panel.directoryURL = dir
-        panel.nameFieldStringValue = CaptureHistory.uniqueURL(in: dir, name: Self.timestampedName()).lastPathComponent
+        panel.nameFieldStringValue = name
         let response = panel.runModal()
         var saved: URL?
         if response == .OK, let url = panel.url {
@@ -244,7 +242,8 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     /// Test path: render the composite, write it to `url`, and end the session (no panel).
     func saveToFile(_ url: URL) throws {
         let (_, image) = try exportImage()
-        try PNGEncoder.write(image, to: url)
+        // Grants access when `url` is inside the bookmarked folder; harmless otherwise.
+        try Settings.withSaveDirectoryAccess { _ in try PNGEncoder.write(image, to: url) }
         CaptureHistory.note(url)
         end(.saved(url))
     }

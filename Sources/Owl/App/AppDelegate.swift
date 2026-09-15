@@ -2,6 +2,7 @@ import AppKit
 import OwlCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static let hasLaunchedBeforeKey = "hasLaunchedBefore"
     private var statusMenu: StatusMenu?
     private var hotkey: GlobalHotkey?
     private var settingsWindowController: SettingsWindowController?
@@ -34,10 +35,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
 
-        if !Permissions.hasScreenCapture {
-            Log.app.notice("Screen Recording not granted; requesting")
-            Permissions.requestScreenCapture()
+        // A menu-bar-only app that shows nothing but a TCC prompt reads as "no UI" to App Review,
+        // so on the very first launch open Settings first; the prompt then lands over a window.
+        // The permission itself is requested on the first capture attempt, not here.
+        if !UserDefaults.standard.bool(forKey: Self.hasLaunchedBeforeKey) {
+            UserDefaults.standard.set(true, forKey: Self.hasLaunchedBeforeKey)
+            openSettings()
         }
+        Clipboard.pruneFileCopies()
         Log.app.info("Owl launched (pid \(getpid()))")
     }
 

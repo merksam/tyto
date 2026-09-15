@@ -13,9 +13,9 @@ enum Clipboard {
         }
         var objects: [NSPasteboardWriting] = [item]
         if alsoAsFile {
-            let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("Owl", isDirectory: true)
+            let dir = fileCopyDirectory
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            pruneFileCopies()
             let f = DateFormatter()
             f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
             let url = dir.appendingPathComponent("Owl \(f.string(from: Date())).png")
@@ -25,6 +25,25 @@ enum Clipboard {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.writeObjects(objects)
+    }
+
+    /// Temp copies for "also copy as file". Inside the app container when sandboxed, so macOS can
+    /// hand the receiving app a sandbox extension for the URL we put on the pasteboard.
+    static var fileCopyDirectory: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("Clipboard", isDirectory: true)
+    }
+
+    /// Drops copies older than `age`; recent ones must survive so a later paste still resolves.
+    static func pruneFileCopies(olderThan age: TimeInterval = 24 * 3600) {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(at: fileCopyDirectory,
+                                                        includingPropertiesForKeys: [.contentModificationDateKey],
+                                                        options: [.skipsHiddenFiles]) else { return }
+        let cutoff = Date().addingTimeInterval(-age)
+        for url in entries {
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+            if let modified, modified < cutoff { try? fm.removeItem(at: url) }
+        }
     }
 
     /// Reads the clipboard image back as PNG data (test harness).

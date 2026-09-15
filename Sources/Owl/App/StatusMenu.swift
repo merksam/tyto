@@ -57,6 +57,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     private func rebuildRecentMenu() {
+        // Thumbnails and modification dates read the files, so hold the scope for the rebuild.
+        Settings.withSaveDirectoryAccess { _ in rebuildRecentMenuInScope() }
+    }
+
+    private func rebuildRecentMenuInScope() {
         recentMenu.removeAllItems()
         let recent = CaptureHistory.recent
         if recent.isEmpty {
@@ -100,11 +105,20 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     @objc private func openSettings() { onOpenSettings() }
     @objc private func openScreenSettings() { Permissions.openScreenCaptureSettings() }
     @objc private func toggleCopyAsFile() { Settings.copyAsFile.toggle() }
-    @objc private func openFolder() { NSWorkspace.shared.open(Settings.saveDirectory) }
+    @objc private func openFolder() {
+        Settings.withSaveDirectoryAccess { dir in
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            NSWorkspace.shared.open(dir)
+        }
+    }
     @objc private func clearRecent() { CaptureHistory.clear() }
 
     /// Re-copy a past capture to the clipboard so it can be pasted again.
     @objc private func copyRecent(_ sender: NSMenuItem) {
+        Settings.withSaveDirectoryAccess { _ in copyRecentInScope(sender) }
+    }
+
+    private func copyRecentInScope(_ sender: NSMenuItem) {
         guard let url = sender.representedObject as? URL,
               let img = NSImage(contentsOf: url),
               let tiff = img.tiffRepresentation,
