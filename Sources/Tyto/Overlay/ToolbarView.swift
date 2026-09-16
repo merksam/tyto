@@ -21,6 +21,8 @@ final class ToolbarView: NSView {
     private let tools = NSSegmentedControl()
     private let colors = NSSegmentedControl()
     private let widths = NSSegmentedControl()
+    private var selectedColorIndex = 0
+    private var selectedWidthIndex = 1
     private let undoButton = NSButton()
     private let redoButton = NSButton()
     private let saveButton = NSButton()
@@ -102,7 +104,17 @@ final class ToolbarView: NSView {
 
     func setState(tool: Tool, color: RGBAColor, width: WidthPreset, canUndo: Bool, canRedo: Bool) {
         tools.selectedSegment = Tool.allCases.firstIndex(of: tool) ?? 0
-        colors.selectedSegment = RGBAColor.palette.firstIndex { $0.color == color } ?? 0
+        let colorIndex = RGBAColor.palette.firstIndex { $0.color == color } ?? 0
+        if colorIndex != selectedColorIndex {
+            selectedColorIndex = colorIndex
+            refreshColorSwatches()
+        }
+        colors.selectedSegment = colorIndex
+        let widthIndex = WidthPreset.allCases.firstIndex(of: width) ?? 1
+        if widthIndex != selectedWidthIndex {
+            selectedWidthIndex = widthIndex
+            refreshWidthDots()
+        }
         widths.selectedSegment = WidthPreset.allCases.firstIndex(of: width) ?? 1
         undoButton.isEnabled = canUndo
         redoButton.isEnabled = canRedo
@@ -119,29 +131,48 @@ final class ToolbarView: NSView {
         }
         tools.trackingMode = .selectOne
         tools.controlSize = .large
+        // Liquid Glass draws selection very faintly; tint it so the active tool is obvious.
+        tools.selectedSegmentBezelColor = .controlAccentColor
         tools.target = self; tools.action = #selector(toolChanged)
 
         colors.segmentCount = RGBAColor.palette.count
         for (i, entry) in RGBAColor.palette.enumerated() {
-            colors.setImage(Self.dot(color: entry.color.nsColor, diameter: 14), forSegment: i)
             colors.setToolTip(entry.name.capitalized, forSegment: i)
             colors.setWidth(26, forSegment: i)
         }
+        refreshColorSwatches()
         colors.trackingMode = .selectOne
         colors.controlSize = .large
         colors.target = self; colors.action = #selector(colorChanged)
 
         widths.segmentCount = WidthPreset.allCases.count
         for (i, w) in WidthPreset.allCases.enumerated() {
-            let img = Self.dot(color: .labelColor, diameter: 4 + CGFloat(i) * 4)
-            img.isTemplate = true
-            widths.setImage(img, forSegment: i)
             widths.setToolTip(w.rawValue.capitalized, forSegment: i)
             widths.setWidth(26, forSegment: i)
         }
+        refreshWidthDots()
         widths.trackingMode = .selectOne
         widths.controlSize = .large
+        widths.selectedSegmentBezelColor = .controlAccentColor
         widths.target = self; widths.action = #selector(widthChanged)
+    }
+
+    /// The selected swatch is drawn larger with a bright ring, so the active colour is legible
+    /// against the glass without tinting the segment (which would distort the colour itself).
+    private func refreshColorSwatches() {
+        for (i, entry) in RGBAColor.palette.enumerated() {
+            colors.setImage(Self.dot(color: entry.color.nsColor, diameter: i == selectedColorIndex ? 17 : 12,
+                                     selected: i == selectedColorIndex), forSegment: i)
+        }
+    }
+
+    /// Drawn rather than templated so the active width is a bright dot against dimmer ones.
+    private func refreshWidthDots() {
+        for (i, _) in WidthPreset.allCases.enumerated() {
+            let selected = i == selectedWidthIndex
+            widths.setImage(Self.dot(color: selected ? .white : NSColor.labelColor.withAlphaComponent(0.55),
+                                     diameter: 4 + CGFloat(i) * 4), forSegment: i)
+        }
     }
 
     private static func configureIconButton(_ b: NSButton, symbol: String, tip: String) {
@@ -160,16 +191,25 @@ final class ToolbarView: NSView {
         return v
     }
 
-    static func dot(color: NSColor, diameter: CGFloat) -> NSImage {
-        let size = CGSize(width: 16, height: 16)
+    static func dot(color: NSColor, diameter: CGFloat, selected: Bool = false) -> NSImage {
+        let size = CGSize(width: 20, height: 20)
         return NSImage(size: size, flipped: false) { rect in
-            let r = CGRect(x: (rect.width - diameter) / 2, y: (rect.height - diameter) / 2, width: diameter, height: diameter)
+            let r = CGRect(x: (rect.width - diameter) / 2, y: (rect.height - diameter) / 2,
+                           width: diameter, height: diameter)
+            if selected {
+                NSColor.white.setStroke()
+                let halo = NSBezierPath(ovalIn: r.insetBy(dx: -2.5, dy: -2.5))
+                halo.lineWidth = 2
+                halo.stroke()
+            }
             color.setFill()
             NSBezierPath(ovalIn: r).fill()
-            NSColor.black.withAlphaComponent(0.25).setStroke()
-            let ring = NSBezierPath(ovalIn: r.insetBy(dx: 0.5, dy: 0.5))
-            ring.lineWidth = 1
-            ring.stroke()
+            if diameter >= 10 {   // outline only the colour swatches, not the small width dots
+                NSColor.black.withAlphaComponent(selected ? 0.45 : 0.25).setStroke()
+                let ring = NSBezierPath(ovalIn: r.insetBy(dx: 0.5, dy: 0.5))
+                ring.lineWidth = 1
+                ring.stroke()
+            }
             return true
         }
     }
