@@ -38,5 +38,11 @@ fi
 
 xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportOptionsPlist "$OPTS" \
   -exportPath "$EXPORT" "${AUTH[@]}"
-echo "exported to: $EXPORT" >&2
-ls -la "$EXPORT" >&2
+
+if [ "${UPLOAD:-0}" = "1" ]; then
+  # Upload mode sends the package straight to App Store Connect and writes no export directory.
+  echo "uploaded to App Store Connect; watch the build appear under TestFlight" >&2
+else
+  echo "exported to: $EXPORT" >&2
+  ls -la "$EXPORT" >&2
+fi
