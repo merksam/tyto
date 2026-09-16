@@ -12,6 +12,8 @@ public struct DebugRequest: Codable, Sendable {
     public var path: String?
     /// Test mode: no app activation, no key window, no presentation-option changes.
     public var test: Bool?
+    /// Staged screenshots: show the floating toolbar even in test mode.
+    public var toolbar: Bool?
     /// Second point for `draw` (x2, y2); free-form value for `tool`, `color`, `width`, `text`, `set`.
     public var x2: Int?
     public var y2: Int?

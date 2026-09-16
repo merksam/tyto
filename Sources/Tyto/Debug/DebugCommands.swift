@@ -35,6 +35,7 @@ enum DebugCommands {
             var options = SessionOptions()
             options.displayIDs = ids
             options.interactive = !(req.test ?? false)
+            options.showsToolbar = req.toolbar ?? false
             try await overlay.beginSession(options: options)
             return .success(overlay.lastTimings.json.merging(stateJSON(overlay)) { a, _ in a })
 

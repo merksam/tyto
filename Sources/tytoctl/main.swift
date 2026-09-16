@@ -7,7 +7,9 @@ usage: tytoctl <command> [options]
 
   ping                                  liveness + permission state
   displays                              list displays (id, name, main, size, scale)
-  capture [--display SPEC] [--test]     freeze + show overlay; --test confines to SPEC, no focus change
+  capture [--display SPEC] [--test] [--toolbar]
+                                        freeze + show overlay; --test confines to SPEC, no focus
+                                        change; --toolbar shows the toolbar for staged shots
   select X Y W H [--display SPEC]       set the selection in display pixels
   state                                 current session state
   copy                                  crop + copy to clipboard, end session
@@ -62,6 +64,9 @@ while i < args.count {
         i += 2
     case "--test":
         request.test = true
+        i += 1
+    case "--toolbar":
+        request.toolbar = true
         i += 1
     default:
         positional.append(args[i])

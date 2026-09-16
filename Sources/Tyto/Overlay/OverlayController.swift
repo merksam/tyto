@@ -7,6 +7,9 @@ struct SessionOptions: Sendable {
     /// Interactive: activate the app, make a window key, hide hot corners, show a crosshair.
     /// Test mode turns all of that off so the harness never disturbs the user.
     var interactive = true
+    /// Shows the floating toolbar in a non-interactive session. Only used to stage screenshots;
+    /// the toolbar is normally hidden in test mode because nothing can click it.
+    var showsToolbar = false
 
     static let interactive = SessionOptions()
 }
@@ -531,7 +534,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     /// Positions the floating toolbar panel over the active display's selection, or hides it.
     private func updateToolbarPanel(session s: Session) {
-        guard s.options.interactive else { return }
+        guard s.options.interactive || s.options.showsToolbar else { return }
         guard let id = s.activeDisplay, let window = windows[id], let selection = s.selection else {
             toolbarPanel.orderOut(nil)
             return
