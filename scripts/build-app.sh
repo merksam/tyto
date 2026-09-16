@@ -19,6 +19,15 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/Tyto" "$APP/Contents/MacOS/$APP_NAME"   # SwiftPM product is Tyto; the shipped binary is Tyto
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
+# Compile the asset catalog so the hand-built bundle carries the same icon as the Xcode build.
+if [ -d "$ROOT/Resources/Assets.xcassets" ]; then
+  xcrun actool "$ROOT/Resources/Assets.xcassets" \
+    --compile "$APP/Contents/Resources" \
+    --platform macosx --minimum-deployment-target 27.0 \
+    --app-icon AppIcon --output-partial-info-plist "$(mktemp -t tyto-actool)" >/dev/null 2>&1 || \
+    echo "actool failed; bundle will have no icon" 1>&2
+fi
+
 IDENTITY="${SIGN_IDENTITY:-}"
 if [ -z "$IDENTITY" ]; then
   IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \

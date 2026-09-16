@@ -42,6 +42,7 @@ targets:
     platform: macOS
     sources:
       - path: Sources/Tyto
+      - path: Resources/Assets.xcassets
     dependencies:
       - target: TytoCore
       - sdk: ScreenCaptureKit.framework
