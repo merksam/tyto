@@ -30,7 +30,7 @@ final class StageView: NSView {
         ctx.restoreGState()
 
         // Document window, centred, 16:10-ish so it sits nicely in a cropped screenshot.
-        let w = b.width * 0.62, h = b.height * 0.66
+        let w = b.width * 0.42, h = b.height * 0.46
         let win = CGRect(x: (b.width - w) / 2, y: (b.height - h) / 2 - b.height * 0.02, width: w, height: h)
         let radius = min(w, h) * 0.022
 

@@ -25,12 +25,13 @@ trap cleanup EXIT
 sleep 2
 
 q() { "$CTL" "$@" >/dev/null; }
-# Crop window: the staged document plus margin, 16:10, scaled down to 2880x1800.
-shot() { "$TMP/crop" "$TMP/$1.png" "$OUT/$1.png" 1000 380 4000 2500 2880 1800; }
+# Crop window: the staged document and the toolbar beneath it, 16:10, output 2880x1800.
+# Kept tight so Tyto's controls, which are a fixed point size, read clearly.
+shot() { "$TMP/crop" "$TMP/$1.png" "$OUT/$1.png" 1664 790 2688 1680 2880 1800; }
 
 echo "== 1. selecting a region" >&2
 q capture --display "$DISPLAY_SPEC"
-q select 1300 800 3300 1700
+q select 1800 980 2400 1350
 sleep 1
 q snapshot "$TMP/01-select.png" --display "$DISPLAY_SPEC"
 q cancel
@@ -38,11 +39,11 @@ shot 01-select
 
 echo "== 2. annotating" >&2
 q capture --display "$DISPLAY_SPEC"
-q select 1300 800 3300 1700
+q select 1800 980 2400 1350
 q width thin
-q color red;   q tool rect;  q draw 1380 840 2700 980
-q color red;   q tool arrow; q draw 3600 1180 4230 1520
-q color red;   q width thick; q tool text; q text 3480 800 "best week yet"
+q color red;   q tool rect;  q draw 1890 1055 2570 1145
+q color red;   q tool arrow; q draw 3350 1230 3810 1440
+q color red;   q width thick; q tool text; q text 2850 1150 "best week yet"
 sleep 1
 q snapshot "$TMP/02-annotate.png" --display "$DISPLAY_SPEC"
 q cancel
@@ -50,10 +51,10 @@ shot 02-annotate
 
 echo "== 3. hiding private details and numbering steps" >&2
 q capture --display "$DISPLAY_SPEC"
-q select 1300 800 3300 1700
-q tool blur;  q draw 1395 2185 2440 2295
+q select 1800 980 2400 1350
+q tool blur;  q draw 1900 1985 2920 2050
 q color orange; q width thick; q tool badge
-q click 1500 900; q click 1500 1760; q click 1500 2240
+q click 1865 1090; q click 1865 1620; q click 1865 2015
 sleep 1
 q snapshot "$TMP/03-blur-steps.png" --display "$DISPLAY_SPEC"
 q cancel
