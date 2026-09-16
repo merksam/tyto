@@ -75,7 +75,7 @@ final class StageView: NSView {
         }
 
         y += h * 0.03
-        let chartH = h * 0.30, chartW = w - pad * 2
+        let chartH = h * 0.22, chartW = w - pad * 2
         let values: [CGFloat] = [0.35, 0.48, 0.42, 0.66, 0.71, 0.94]
         let barW = chartW / CGFloat(values.count) * 0.52
         for (i, v) in values.enumerated() {
@@ -91,9 +91,29 @@ final class StageView: NSView {
         y += chartH + h * 0.05
         NSColor(white: 0.90, alpha: 1).setFill()
         NSBezierPath(rect: CGRect(x: win.minX + pad, y: y, width: chartW, height: 1)).fill()
-        y += h * 0.045
-        text("Owner   a.kovalenko@example.com", at: CGPoint(x: win.minX + pad, y: y), size: h * 0.020,
-             weight: .regular, color: NSColor(white: 0.40, alpha: 1))
+        y += h * 0.040
+        let colName = win.minX + pad
+        let colMail = win.minX + pad + chartW * 0.30
+        let colAmt = win.minX + pad + chartW * 0.74
+        text("REVIEWER", at: CGPoint(x: colName, y: y), size: h * 0.015, weight: .semibold,
+             color: NSColor(white: 0.58, alpha: 1))
+        text("EMAIL", at: CGPoint(x: colMail, y: y), size: h * 0.015, weight: .semibold,
+             color: NSColor(white: 0.58, alpha: 1))
+        text("MERGED", at: CGPoint(x: colAmt, y: y), size: h * 0.015, weight: .semibold,
+             color: NSColor(white: 0.58, alpha: 1))
+        y += h * 0.030
+        for row in [("Anna Kovalenko", "a.kovalenko@example.com", "38"),
+                    ("Dmytro Shevchuk", "d.shevchuk@example.com", "31"),
+                    ("Olena Bondar", "o.bondar@example.com", "24")] {
+            text(row.0, at: CGPoint(x: colName, y: y), size: h * 0.021, weight: .regular,
+                 color: NSColor(white: 0.22, alpha: 1))
+            text(row.1, at: CGPoint(x: colMail, y: y), size: h * 0.021, weight: .regular,
+                 color: NSColor(white: 0.22, alpha: 1))
+            text(row.2, at: CGPoint(x: colAmt, y: y), size: h * 0.021, weight: .regular,
+                 color: NSColor(white: 0.22, alpha: 1))
+            y += h * 0.038
+        }
+        y -= h * 0.038
 
         y += h * 0.075
         let btnH = h * 0.075, btnW = w * 0.16, gap = w * 0.035

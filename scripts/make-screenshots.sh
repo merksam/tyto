@@ -60,10 +60,10 @@ panel 02-annotate "Mark it up without leaving the capture." \
 echo "== 3 blur" >&2
 q capture --display "$DISPLAY_SPEC"
 q select 1800 980 2400 1350
-q tool blur; q draw 1900 1985 2920 2050
+q tool blur; q draw 2545 1900 3010 2090
 scene 03-blur
-panel 03-blur "Hide anything private." \
-  "Pixelate a name, an address or a key before you share."
+panel 03-blur "Blur out anything private." \
+  "Emails, names, keys: drag over them and they are gone."
 
 echo "== 4 steps" >&2
 q capture --display "$DISPLAY_SPEC"
