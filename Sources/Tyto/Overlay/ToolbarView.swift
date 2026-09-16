@@ -21,8 +21,8 @@ final class ToolbarView: NSView {
     private let tools = NSSegmentedControl()
     private let colors = NSSegmentedControl()
     private let widths = NSSegmentedControl()
-    private var selectedColorIndex = 0
     private var selectedWidthIndex = 1
+    private var selectedToolIndex = 0
     private let undoButton = NSButton()
     private let redoButton = NSButton()
     private let saveButton = NSButton()
@@ -103,13 +103,13 @@ final class ToolbarView: NSView {
 
 
     func setState(tool: Tool, color: RGBAColor, width: WidthPreset, canUndo: Bool, canRedo: Bool) {
-        tools.selectedSegment = Tool.allCases.firstIndex(of: tool) ?? 0
-        let colorIndex = RGBAColor.palette.firstIndex { $0.color == color } ?? 0
-        if colorIndex != selectedColorIndex {
-            selectedColorIndex = colorIndex
-            refreshColorSwatches()
+        let toolIndex = Tool.allCases.firstIndex(of: tool) ?? 0
+        if toolIndex != selectedToolIndex {
+            selectedToolIndex = toolIndex
+            refreshToolIcons()
         }
-        colors.selectedSegment = colorIndex
+        tools.selectedSegment = toolIndex
+        colors.selectedSegment = RGBAColor.palette.firstIndex { $0.color == color } ?? 0
         let widthIndex = WidthPreset.allCases.firstIndex(of: width) ?? 1
         if widthIndex != selectedWidthIndex {
             selectedWidthIndex = widthIndex
@@ -125,22 +125,20 @@ final class ToolbarView: NSView {
     private func configureSegments() {
         tools.segmentCount = Tool.allCases.count
         for (i, t) in Tool.allCases.enumerated() {
-            tools.setImage(NSImage(systemSymbolName: t.symbol, accessibilityDescription: t.title), forSegment: i)
             tools.setToolTip("\(t.title) (\(t.key.uppercased()))", forSegment: i)
             tools.setWidth(30, forSegment: i)
         }
+        refreshToolIcons()
         tools.trackingMode = .selectOne
         tools.controlSize = .large
-        // Liquid Glass draws selection very faintly; tint it so the active tool is obvious.
-        tools.selectedSegmentBezelColor = .controlAccentColor
         tools.target = self; tools.action = #selector(toolChanged)
 
         colors.segmentCount = RGBAColor.palette.count
         for (i, entry) in RGBAColor.palette.enumerated() {
+            colors.setImage(Self.dot(color: entry.color.nsColor, diameter: 14), forSegment: i)
             colors.setToolTip(entry.name.capitalized, forSegment: i)
             colors.setWidth(26, forSegment: i)
         }
-        refreshColorSwatches()
         colors.trackingMode = .selectOne
         colors.controlSize = .large
         colors.target = self; colors.action = #selector(colorChanged)
@@ -153,17 +151,36 @@ final class ToolbarView: NSView {
         refreshWidthDots()
         widths.trackingMode = .selectOne
         widths.controlSize = .large
-        widths.selectedSegmentBezelColor = .controlAccentColor
         widths.target = self; widths.action = #selector(widthChanged)
     }
 
-    /// The selected swatch is drawn larger with a bright ring, so the active colour is legible
-    /// against the glass without tinting the segment (which would distort the colour itself).
-    private func refreshColorSwatches() {
-        for (i, entry) in RGBAColor.palette.enumerated() {
-            colors.setImage(Self.dot(color: entry.color.nsColor, diameter: i == selectedColorIndex ? 17 : 12,
-                                     selected: i == selectedColorIndex), forSegment: i)
+    /// A template symbol renders pale on the equally pale selection capsule, so the armed tool
+    /// was hard to pick out. Draw the icons with explicit weight and colour instead: the active
+    /// one is full-contrast and bold, the rest are dimmed.
+    private func refreshToolIcons() {
+        for (i, t) in Tool.allCases.enumerated() {
+            let selected = i == selectedToolIndex
+            tools.setImage(Self.symbol(t.symbol,
+                                       color: selected ? .labelColor : .secondaryLabelColor,
+                                       weight: selected ? .bold : .regular,
+                                       description: t.title), forSegment: i)
         }
+    }
+
+    /// An SF Symbol rendered at a fixed weight and tinted, rather than left as a template.
+    static func symbol(_ name: String, color: NSColor, weight: NSFont.Weight,
+                       description: String) -> NSImage? {
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: weight)
+        guard let base = NSImage(systemSymbolName: name, accessibilityDescription: description)?
+            .withSymbolConfiguration(config) else { return nil }
+        let tinted = NSImage(size: base.size, flipped: false) { rect in
+            base.draw(in: rect)
+            color.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.isTemplate = false
+        return tinted
     }
 
     /// Drawn rather than templated so the active width is a bright dot against dimmer ones.
@@ -191,21 +208,15 @@ final class ToolbarView: NSView {
         return v
     }
 
-    static func dot(color: NSColor, diameter: CGFloat, selected: Bool = false) -> NSImage {
-        let size = CGSize(width: 20, height: 20)
+    static func dot(color: NSColor, diameter: CGFloat) -> NSImage {
+        let size = CGSize(width: 16, height: 16)
         return NSImage(size: size, flipped: false) { rect in
             let r = CGRect(x: (rect.width - diameter) / 2, y: (rect.height - diameter) / 2,
                            width: diameter, height: diameter)
-            if selected {
-                NSColor.white.setStroke()
-                let halo = NSBezierPath(ovalIn: r.insetBy(dx: -2.5, dy: -2.5))
-                halo.lineWidth = 2
-                halo.stroke()
-            }
             color.setFill()
             NSBezierPath(ovalIn: r).fill()
-            if diameter >= 10 {   // outline only the colour swatches, not the small width dots
-                NSColor.black.withAlphaComponent(selected ? 0.45 : 0.25).setStroke()
+            if diameter >= 10 {   // outline the colour swatches, not the small width dots
+                NSColor.black.withAlphaComponent(0.25).setStroke()
                 let ring = NSBezierPath(ovalIn: r.insetBy(dx: 0.5, dy: 0.5))
                 ring.lineWidth = 1
                 ring.stroke()
