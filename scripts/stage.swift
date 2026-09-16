@@ -94,6 +94,24 @@ final class StageView: NSView {
         y += h * 0.045
         text("Owner   a.kovalenko@example.com", at: CGPoint(x: win.minX + pad, y: y), size: h * 0.020,
              weight: .regular, color: NSColor(white: 0.40, alpha: 1))
+
+        y += h * 0.075
+        let btnH = h * 0.075, btnW = w * 0.16, gap = w * 0.035
+        for (i, title) in ["Filter", "Export", "Share"].enumerated() {
+            let r = CGRect(x: win.minX + pad + CGFloat(i) * (btnW + gap), y: y, width: btnW, height: btnH)
+            let primary = i == 2
+            (primary ? NSColor(srgbRed: 0.20, green: 0.52, blue: 0.96, alpha: 1)
+                     : NSColor(white: 0.94, alpha: 1)).setFill()
+            NSBezierPath(roundedRect: r, xRadius: btnH * 0.28, yRadius: btnH * 0.28).fill()
+            if !primary {
+                NSColor(white: 0.84, alpha: 1).setStroke()
+                let b = NSBezierPath(roundedRect: r.insetBy(dx: 0.5, dy: 0.5),
+                                     xRadius: btnH * 0.28, yRadius: btnH * 0.28)
+                b.lineWidth = 1; b.stroke()
+            }
+            text(title, at: CGPoint(x: r.midX, y: r.midY), size: h * 0.024, weight: .medium,
+                 color: primary ? .white : NSColor(white: 0.25, alpha: 1), centred: true)
+        }
         ctx.restoreGState()
     }
 
