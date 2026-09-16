@@ -6,3 +6,7 @@ build/
 out/
 Tyto.xcodeproj/
 *.xcarchive
+
+# Downloaded webfont used only to render marketing panels
+design/fonts/
+design/*.html

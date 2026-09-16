@@ -1,19 +1,39 @@
-// Wraps a product screenshot in an App Store marketing panel: branded background, a headline
-// stating the benefit, and the shot inset with a shadow.
+// Wraps a product screenshot in an App Store marketing panel.
 //
-// Every shipping screenshot app does this (Monosnap, Snagit); a bare crop sells nothing.
-// usage: swift scripts/compose-panel.swift IN OUT "Headline" ["Subline"]
+// Direction "Forest": a deep green block carries the headline on the left, an oversized
+// outlined numeral indexes the panel, and the screenshot bleeds off the right edge. Colours
+// deliberately avoid the icon's amber, which read as too yellow at panel size.
+//
+// usage: compose-panel IN OUT INDEX "Headline" ["Subline"]
 import AppKit
+import CoreText
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
 let args = CommandLine.arguments
-guard args.count >= 4 else {
-    FileHandle.standardError.write(Data("usage: IN OUT headline [subline]\n".utf8)); exit(2)
+guard args.count >= 5 else {
+    FileHandle.standardError.write(Data("usage: IN OUT INDEX headline [subline]\n".utf8)); exit(2)
 }
-let headline = args[3]
-let subline = args.count > 4 ? args[4] : ""
+let index = args[3], headline = args[4]
+let subline = args.count > 5 ? args[5] : ""
+
+// Space Grotesk is not a system face; register the downloaded copy so the panels match the
+// approved direction. Falls back to the system font if the file is missing.
+let fontURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    .appendingPathComponent("design/fonts/SpaceGrotesk.ttf")
+var haveGrotesk = false
+if FileManager.default.fileExists(atPath: fontURL.path) {
+    haveGrotesk = CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, nil)
+}
+func face(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont {
+    if haveGrotesk {
+        let name = weight >= .bold ? "SpaceGrotesk-Bold" : "SpaceGrotesk-Medium"
+        if let f = NSFont(name: name, size: size) { return f }
+        if let f = NSFont(name: "SpaceGrotesk", size: size) { return f }
+    }
+    return NSFont.systemFont(ofSize: size, weight: weight)
+}
 
 let W = 2880, H = 1800
 let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: args[1]) as CFURL, nil)!
@@ -22,62 +42,100 @@ let shot = CGImageSourceCreateImageAtIndex(src, 0, nil)!
 let ctx = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: 0,
                     space: CGColorSpace(name: CGColorSpace.sRGB)!,
                     bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
-let ns = NSGraphicsContext(cgContext: ctx, flipped: false)
 NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = ns
+NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
 
-// Background: the icon's dusk palette, so the listing and the icon read as one product.
-let bg = NSGradient(colors: [NSColor(srgbRed: 0.17, green: 0.20, blue: 0.34, alpha: 1),
-                             NSColor(srgbRed: 0.07, green: 0.08, blue: 0.14, alpha: 1)])!
-bg.draw(in: CGRect(x: 0, y: 0, width: W, height: H), angle: -90)
+let deep = NSColor(srgbRed: 0.043, green: 0.078, blue: 0.063, alpha: 1)    // #0b1410
+let forest = NSColor(srgbRed: 0.078, green: 0.224, blue: 0.173, alpha: 1)  // #14392c
+let mint = NSColor(srgbRed: 0.624, green: 0.839, blue: 0.706, alpha: 1)    // #9fd6b4
+let paper = NSColor(srgbRed: 0.949, green: 0.969, blue: 0.953, alpha: 1)   // #f2f7f3
+
+deep.setFill()
+ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+
+let blockW = CGFloat(W) * 0.45
+forest.setFill()
+ctx.fill(CGRect(x: 0, y: 0, width: blockW, height: CGFloat(H)))
+
+// Oversized index numeral, outlined, bleeding off the block's bottom-right corner.
 ctx.saveGState()
-ctx.setBlendMode(.plusLighter)
-// Drawn across the whole canvas: a radial gradient confined to a sub-rect leaves a visible
-// rectangular seam where the fill stops.
-NSGradient(colors: [NSColor(white: 1, alpha: 0.06), NSColor(white: 1, alpha: 0)])!
-    .draw(in: CGRect(x: 0, y: 0, width: W, height: H),
-          relativeCenterPosition: CGPoint(x: -0.45, y: 0.35))
+ctx.clip(to: CGRect(x: 0, y: 0, width: blockW, height: CGFloat(H)))
+let numeral = NSAttributedString(string: index, attributes: [
+    .font: face(780, .bold),
+    .foregroundColor: NSColor.clear,
+    .strokeColor: mint.withAlphaComponent(0.22),
+    .strokeWidth: 2.2,
+])
+numeral.draw(at: CGPoint(x: blockW - numeral.size().width + 96, y: -196))
 ctx.restoreGState()
 
-func draw(_ s: String, at p: CGPoint, size: CGFloat, weight: NSFont.Weight, alpha: CGFloat) {
-    guard !s.isEmpty else { return }
-    let attrs: [NSAttributedString.Key: Any] = [
-        .font: NSFont.systemFont(ofSize: size, weight: weight),
-        .foregroundColor: NSColor(white: 1, alpha: alpha),
-    ]
-    NSAttributedString(string: s, attributes: attrs).draw(at: p)
+let margin: CGFloat = 118
+let textW = blockW - margin * 2
+
+func draw(_ s: String, size: CGFloat, weight: NSFont.Weight, color: NSColor,
+          tracking: CGFloat = 0, at y: CGFloat) -> CGFloat {
+    let p = NSMutableParagraphStyle()
+    p.lineHeightMultiple = 0.98
+    let a = NSAttributedString(string: s, attributes: [
+        .font: face(size, weight), .foregroundColor: color,
+        .kern: tracking, .paragraphStyle: p,
+    ])
+    let bounds = a.boundingRect(with: CGSize(width: textW, height: 2000),
+                                options: [.usesLineFragmentOrigin, .usesFontLeading])
+    a.draw(with: CGRect(x: margin, y: y - bounds.height, width: textW, height: bounds.height),
+           options: [.usesLineFragmentOrigin, .usesFontLeading])
+    return bounds.height
 }
 
-// Text sits at the top; NSGraphicsContext here is not flipped, so y counts up from the bottom.
-let margin: CGFloat = 190
-draw(headline, at: CGPoint(x: margin, y: CGFloat(H) - 195), size: 82, weight: .bold, alpha: 1)
-draw(subline, at: CGPoint(x: margin, y: CGFloat(H) - 285), size: 42, weight: .regular, alpha: 0.62)
+// Block text is vertically centred as a group.
+let eyebrowH: CGFloat = 40, gap1: CGFloat = 46, gap2: CGFloat = 54
+let headProbe = NSAttributedString(string: headline, attributes: [.font: face(102, .bold)])
+    .boundingRect(with: CGSize(width: textW, height: 2000),
+                  options: [.usesLineFragmentOrigin, .usesFontLeading]).height
+let subProbe = subline.isEmpty ? 0 : NSAttributedString(string: subline, attributes: [.font: face(44, .medium)])
+    .boundingRect(with: CGSize(width: textW, height: 2000),
+                  options: [.usesLineFragmentOrigin, .usesFontLeading]).height
+let groupH = eyebrowH + gap1 + headProbe + (subline.isEmpty ? 0 : gap2 + subProbe)
+var cursor = (CGFloat(H) + groupH) / 2
 
-// Product shot: fit the remaining area, rounded, with a shadow to lift it off the background.
-let topUsed: CGFloat = subline.isEmpty ? 300 : 380
-let available = CGSize(width: CGFloat(W) - margin * 2, height: CGFloat(H) - topUsed - 150)
-let aspect = CGFloat(shot.width) / CGFloat(shot.height)
-var shotSize = CGSize(width: available.width, height: available.width / aspect)
-if shotSize.height > available.height {
-    shotSize = CGSize(width: available.height * aspect, height: available.height)
+_ = draw(index + " — TYTO", size: 30, weight: .medium, color: mint, tracking: 5.4, at: cursor)
+cursor -= eyebrowH + gap1
+_ = draw(headline, size: 102, weight: .bold, color: paper, tracking: -3.0, at: cursor)
+cursor -= headProbe + gap2
+if !subline.isEmpty {
+    _ = draw(subline, size: 44, weight: .medium, color: paper.withAlphaComponent(0.56), at: cursor)
 }
-let shotRect = CGRect(x: (CGFloat(W) - shotSize.width) / 2,
-                      y: 150 + (available.height - shotSize.height) / 2,
-                      width: shotSize.width, height: shotSize.height)
-
-ctx.saveGState()
-ctx.setShadow(offset: CGSize(width: 0, height: -26), blur: 60,
-              color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.55))
-NSColor.black.setFill()
-NSBezierPath(roundedRect: shotRect, xRadius: 26, yRadius: 26).fill()
-ctx.restoreGState()
-
-ctx.saveGState()
-NSBezierPath(roundedRect: shotRect, xRadius: 26, yRadius: 26).addClip()
-ctx.draw(shot, in: shotRect)
-ctx.restoreGState()
 
 NSGraphicsContext.restoreGraphicsState()
+
+// Screenshot bleeds off the right edge, rounded only on the leading corners.
+let shotX = CGFloat(W) * 0.41
+let shotW = CGFloat(W) - shotX + 260
+let shotH = shotW * CGFloat(shot.height) / CGFloat(shot.width)
+let shotRect = CGRect(x: shotX, y: (CGFloat(H) - shotH) / 2, width: shotW, height: shotH)
+let r: CGFloat = 34
+let clip = CGMutablePath()
+clip.move(to: CGPoint(x: shotRect.minX + r, y: shotRect.minY))
+clip.addLine(to: CGPoint(x: shotRect.maxX, y: shotRect.minY))
+clip.addLine(to: CGPoint(x: shotRect.maxX, y: shotRect.maxY))
+clip.addLine(to: CGPoint(x: shotRect.minX + r, y: shotRect.maxY))
+clip.addArc(tangent1End: CGPoint(x: shotRect.minX, y: shotRect.maxY),
+            tangent2End: CGPoint(x: shotRect.minX, y: shotRect.maxY - r), radius: r)
+clip.addLine(to: CGPoint(x: shotRect.minX, y: shotRect.minY + r))
+clip.addArc(tangent1End: CGPoint(x: shotRect.minX, y: shotRect.minY),
+            tangent2End: CGPoint(x: shotRect.minX + r, y: shotRect.minY), radius: r)
+clip.closeSubpath()
+
+ctx.saveGState()
+ctx.setShadow(offset: CGSize(width: -14, height: -30), blur: 90,
+              color: CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.7))
+ctx.addPath(clip); ctx.setFillColor(NSColor.black.cgColor); ctx.fillPath()
+ctx.restoreGState()
+
+ctx.saveGState()
+ctx.addPath(clip); ctx.clip()
+ctx.draw(shot, in: shotRect)
+ctx.restoreGState()
 
 let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: args[2]) as CFURL,
                                            UTType.png.identifier as CFString, 1, nil)!
