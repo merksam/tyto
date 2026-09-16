@@ -1,15 +1,15 @@
-# Owl
+# Tyto
 
 Fast region screenshot + annotation for macOS 27. See `PLAN.md`.
 
 ```bash
-swift test                    # OwlCore unit tests
-scripts/dev.sh                # build Owl.app, sign, relaunch, ping the debug socket
+swift test                    # TytoCore unit tests
+scripts/dev.sh                # build Tyto.app, sign, relaunch, ping the debug socket
 scripts/e2e-phase2.sh         # drive the real app on the secondary display, PNGs in out/
-.build/debug/owlctl --help
-.build/debug/owlctl container  # sandbox container; the debug socket lives in <container>/tmp
+.build/debug/tytoctl --help
+.build/debug/tytoctl container  # sandbox container; the debug socket lives in <container>/tmp
 ```
 
-Every build is sandboxed (`Resources/Owl.entitlements`); see `docs/mac-app-store.md`.
+Every build is sandboxed (`Resources/Tyto.entitlements`); see `docs/mac-app-store.md`.
 
 Default hotkey: ⌘⇧9. Esc cancels, Enter or ⌘C copies the selection to the clipboard.

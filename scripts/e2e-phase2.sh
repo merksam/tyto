@@ -3,8 +3,8 @@
 # Produces PNGs in out/ that a human (or Claude) can look at.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CTL="$(cd "$ROOT" && swift build -c "${CONFIG:-debug}" --show-bin-path)/owlctl"
-DISPLAY_SPEC="${OWL_TEST_DISPLAY:-secondary}"
+CTL="$(cd "$ROOT" && swift build -c "${CONFIG:-debug}" --show-bin-path)/tytoctl"
+DISPLAY_SPEC="${TYTO_TEST_DISPLAY:-secondary}"
 OUT="$ROOT/out"
 mkdir -p "$OUT"
 rm -f "$OUT"/e2e-*.png

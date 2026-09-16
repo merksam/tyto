@@ -1,10 +1,10 @@
-# Generates Owl.xcodeproj (git-ignored). Regenerate with scripts/gen-project.sh.
-# The SwiftPM package stays the source of truth for OwlCore, owlctl and the tests;
+# Generates Tyto.xcodeproj (git-ignored). Regenerate with scripts/gen-project.sh.
+# The SwiftPM package stays the source of truth for TytoCore, tytoctl and the tests;
 # this project exists so the app can be archived and uploaded to the Mac App Store,
 # which a SwiftPM-only build cannot do.
-name: Owl
+name: Tyto
 options:
-  bundleIdPrefix: com.owl
+  bundleIdPrefix: com.yevhenii
   deploymentTarget:
     macOS: "27.0"
   createIntermediateGroups: true
@@ -20,41 +20,41 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "27.0"
 
 targets:
-  # OwlCore is compiled as its own target rather than pulled in through the SwiftPM package:
+  # TytoCore is compiled as its own target rather than pulled in through the SwiftPM package:
   # Xcode cannot resolve a local package whose path is the project's own directory. The same
-  # sources still build as a SwiftPM library for `swift build`, `swift test` and owlctl.
-  OwlCore:
+  # sources still build as a SwiftPM library for `swift build`, `swift test` and tytoctl.
+  TytoCore:
     # Static library, not a framework: nothing to embed, sign or version, and the Swift module
-    # is importable all the same. Matches SwiftPM, where OwlCore is a plain library.
+    # is importable all the same. Matches SwiftPM, where TytoCore is a plain library.
     type: library.static
     platform: macOS
     sources:
-      - path: Sources/OwlCore
+      - path: Sources/TytoCore
     settings:
       base:
-        PRODUCT_NAME: OwlCore
-        PRODUCT_MODULE_NAME: OwlCore
+        PRODUCT_NAME: TytoCore
+        PRODUCT_MODULE_NAME: TytoCore
         SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
         SKIP_INSTALL: YES
 
-  Owl:
+  Tyto:
     type: application
     platform: macOS
     sources:
-      - path: Sources/Owl
+      - path: Sources/Tyto
     dependencies:
-      - target: OwlCore
+      - target: TytoCore
       - sdk: ScreenCaptureKit.framework
       - sdk: Carbon.framework
       - sdk: ServiceManagement.framework
     settings:
       base:
-        PRODUCT_NAME: Owl
-        PRODUCT_MODULE_NAME: Owl
-        PRODUCT_BUNDLE_IDENTIFIER: com.owl.app
+        PRODUCT_NAME: Tyto
+        PRODUCT_MODULE_NAME: Tyto
+        PRODUCT_BUNDLE_IDENTIFIER: com.yevhenii.tyto
         INFOPLIST_FILE: Resources/Info.plist
         GENERATE_INFOPLIST_FILE: NO
-        CODE_SIGN_ENTITLEMENTS: Resources/Owl.entitlements
+        CODE_SIGN_ENTITLEMENTS: Resources/Tyto.entitlements
         # Matches the SwiftPM target's .defaultIsolation(MainActor.self)
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         COMBINE_HIDPI_IMAGES: YES
@@ -70,12 +70,12 @@ targets:
           CODE_SIGN_STYLE: Automatic
 
 schemes:
-  # Named OwlApp, not Owl: the package also vends an `Owl` executable product, and two schemes
-  # with the same name make `xcodebuild -scheme Owl` ambiguous. The product is still Owl.app.
-  OwlApp:
+  # Named TytoApp, not Tyto: the package also vends an `Tyto` executable product, and two schemes
+  # with the same name make `xcodebuild -scheme Tyto` ambiguous. The product is still Tyto.app.
+  TytoApp:
     build:
       targets:
-        Owl: all
+        Tyto: all
     run:
       config: Debug
     archive:

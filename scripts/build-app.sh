@@ -1,13 +1,13 @@
 #!/bin/bash
-# Builds Owl.app into build/ and signs it.
+# Builds Tyto.app into build/ and signs it.
 # A real bundle with a stable signature is required for the Screen Recording grant to persist.
 # Signing: SIGN_IDENTITY env var, else the first "Developer ID Application" identity in the
 # keychain, else ad-hoc (the TCC grant will then be lost on every rebuild).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="${CONFIG:-debug}"
-APP_NAME="Owl"
-BUNDLE_ID="com.owl.app"
+APP_NAME="Tyto"
+BUNDLE_ID="com.yevhenii.tyto"
 APP="$ROOT/build/$APP_NAME.app"
 
 cd "$ROOT"
@@ -16,7 +16,7 @@ BIN="$(swift build -c "$CONFIG" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN/Owl" "$APP/Contents/MacOS/Owl"
+cp "$BIN/Tyto" "$APP/Contents/MacOS/$APP_NAME"   # SwiftPM product is Tyto; the shipped binary is Tyto
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
 IDENTITY="${SIGN_IDENTITY:-}"
@@ -26,7 +26,7 @@ if [ -z "$IDENTITY" ]; then
 fi
 
 # Every build is sandboxed (Mac App Store posture). SANDBOX=0 is a bisecting escape hatch only.
-ENTITLEMENTS="$ROOT/Resources/Owl.entitlements"
+ENTITLEMENTS="$ROOT/Resources/Tyto.entitlements"
 ENT_ARGS=(--entitlements "$ENTITLEMENTS")
 if [ "${SANDBOX:-1}" = "0" ]; then
   ENT_ARGS=()

@@ -8,7 +8,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 METHOD="${METHOD:-devid}"
-ARCHIVE="$ROOT/build/Owl.xcarchive"
+ARCHIVE="$ROOT/build/Tyto.xcarchive"
 
 case "$METHOD" in
   store) OPTS_SRC="$ROOT/ExportOptions/AppStore.plist";   EXPORT="$ROOT/build/export-store" ;;
@@ -25,7 +25,7 @@ fi
 
 "$ROOT/scripts/gen-project.sh" >/dev/null
 rm -rf "$ARCHIVE" "$EXPORT"
-xcodebuild -project "$ROOT/Owl.xcodeproj" -scheme OwlApp -configuration Release \
+xcodebuild -project "$ROOT/Tyto.xcodeproj" -scheme TytoApp -configuration Release \
   -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" archive "${AUTH[@]}"
 
 OPTS="$ROOT/build/ExportOptions-$METHOD.plist"

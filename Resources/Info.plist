@@ -5,15 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Owl</string>
+	<string>Tyto</string>
 	<key>CFBundleExecutable</key>
-	<string>Owl</string>
+	<string>Tyto</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.owl.app</string>
+	<string>com.yevhenii.tyto</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Owl</string>
+	<string>Tyto</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

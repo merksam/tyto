@@ -2,15 +2,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "Owl",
+    name: "Tyto",
     platforms: [.macOS("27.0")],
     targets: [
         // Pure model + geometry, no AppKit. Unit-tested.
-        .target(name: "OwlCore"),
+        .target(name: "TytoCore"),
         // The menu-bar app.
         .executableTarget(
-            name: "Owl",
-            dependencies: ["OwlCore"],
+            name: "Tyto",
+            dependencies: ["TytoCore"],
             swiftSettings: [.defaultIsolation(MainActor.self)],
             linkerSettings: [
                 .linkedFramework("ScreenCaptureKit"),
@@ -18,7 +18,7 @@ let package = Package(
             ]
         ),
         // Debug/test CLI that drives the running app over a unix socket.
-        .executableTarget(name: "owlctl", dependencies: ["OwlCore"]),
-        .testTarget(name: "OwlCoreTests", dependencies: ["OwlCore"]),
+        .executableTarget(name: "tytoctl", dependencies: ["TytoCore"]),
+        .testTarget(name: "TytoCoreTests", dependencies: ["TytoCore"]),
     ]
 )

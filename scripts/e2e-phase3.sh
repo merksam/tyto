@@ -3,8 +3,8 @@
 # press/drag/release path the mouse uses. Produces PNGs in out/ for inspection.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CTL="$(cd "$ROOT" && swift build -c "${CONFIG:-debug}" --show-bin-path)/owlctl"
-DISPLAY_SPEC="${OWL_TEST_DISPLAY:-secondary}"
+CTL="$(cd "$ROOT" && swift build -c "${CONFIG:-debug}" --show-bin-path)/tytoctl"
+DISPLAY_SPEC="${TYTO_TEST_DISPLAY:-secondary}"
 OUT="$ROOT/out"
 mkdir -p "$OUT"
 rm -f "$OUT"/e2e3-*.png
@@ -27,7 +27,7 @@ q color orange; q tool ellipse; q draw 1050 780 1450 1050
 q color purple; q tool blur;    q draw 1500 400 1900 600
 q color yellow; q tool badge;   q click 1600 800
 q click 1750 800
-q color white;  q width thick;  q text 520 1080 "Hello Owl ünïcode"
+q color white;  q width thick;  q text 520 1080 "Hello Tyto ünïcode"
 q color black;  q width thin;   q text 1200 1120 "black on light"
 "$CTL" shapes | /usr/bin/grep -c '"kind"' | sed 's/^/shape count: /' 1>&2
 
