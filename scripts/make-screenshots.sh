@@ -41,7 +41,7 @@ q capture --display "$DISPLAY_SPEC"
 q select 1300 800 3300 1700
 q width thin
 q color red;   q tool rect;  q draw 1380 840 2700 980
-q color blue;  q tool arrow; q draw 3600 1180 4230 1520
+q color red;   q tool arrow; q draw 3600 1180 4230 1520
 q color red;   q width thick; q tool text; q text 3480 800 "best week yet"
 sleep 1
 q snapshot "$TMP/02-annotate.png" --display "$DISPLAY_SPEC"

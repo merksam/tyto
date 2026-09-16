@@ -71,9 +71,9 @@ enum WidthPreset: String, CaseIterable, Sendable {
 
     var fontPoints: CGFloat {
         switch self {
-        case .thin: 14
-        case .medium: 18
-        case .thick: 26
+        case .thin: 18
+        case .medium: 26
+        case .thick: 38
         }
     }
 

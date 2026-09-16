@@ -154,13 +154,13 @@ public enum AnnotationRenderer {
     /// Contrasting halo colour for text of this colour, used for legibility on any background.
     public static func haloColor(for color: RGBAColor) -> CGColor {
         color.luminance < 0.35
-            ? CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.9)
-            : CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.85)
+            ? CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.65)
+            : CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.55)
     }
 
     /// Halo blur radius for a given font size, shared with the inline editor so typing and the
     /// committed shape look identical.
-    public static func haloBlur(fontSize: Double) -> Double { fontSize * 0.12 }
+    public static func haloBlur(fontSize: Double) -> Double { fontSize * 0.055 }
 
     /// Left/top inset of the glyphs inside a text shape's bounds; leaves room for the halo.
     public static func textPadding(fontSize: Double) -> Double { ceil(fontSize * 0.08) }
@@ -196,7 +196,6 @@ public enum AnnotationRenderer {
             // heavier once committed) and closes the counters of e/a/o into blobs. The halo leaves
             // glyph weight untouched. Drawn twice for density, then once more clean on top.
             ctx.setShadow(offset: .zero, blur: CGFloat(haloBlur(fontSize: fontSize)), color: haloColor(for: color))
-            drawLines()
             drawLines()
             ctx.setShadow(offset: .zero, blur: 0, color: nil)
         }
