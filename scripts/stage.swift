@@ -102,9 +102,9 @@ final class StageView: NSView {
         text("MERGED", at: CGPoint(x: colAmt, y: y), size: h * 0.015, weight: .semibold,
              color: NSColor(white: 0.58, alpha: 1))
         y += h * 0.030
-        for row in [("Anna Kovalenko", "a.kovalenko@example.com", "38"),
-                    ("Dmytro Shevchuk", "d.shevchuk@example.com", "31"),
-                    ("Olena Bondar", "o.bondar@example.com", "24")] {
+        for row in [("Sarah Mitchell", "s.mitchell@example.com", "38"),
+                    ("James Carter", "j.carter@example.com", "31"),
+                    ("Emily Brooks", "e.brooks@example.com", "24")] {
             text(row.0, at: CGPoint(x: colName, y: y), size: h * 0.021, weight: .regular,
                  color: NSColor(white: 0.22, alpha: 1))
             text(row.1, at: CGPoint(x: colMail, y: y), size: h * 0.021, weight: .regular,
