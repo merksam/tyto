@@ -15,7 +15,7 @@ nonisolated struct DisplayInfo: Sendable {
 }
 
 /// One display's frozen frame plus the geometry needed to map points to its pixels.
-nonisolated struct DisplaySnapshot: @unchecked Sendable {
+nonisolated struct DisplaySnapshot: Sendable {
     let displayID: CGDirectDisplayID
     let screenFrame: CGRect
     let geometry: DisplayGeometry

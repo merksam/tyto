@@ -201,6 +201,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     static func timestampedName() -> String {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")   // fixed format needs a fixed locale
         f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
         return "Tyto \(f.string(from: Date())).png"
     }
@@ -361,7 +362,13 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     func press(at p: PixelPoint, on displayID: CGDirectDisplayID) {
         guard var s = session, let snap = s.snapshots[displayID] else { return }
-        if let v = windows[displayID]?.selectionView, v.isEditingText { v.commitTextEditing(); s = session! }
+        if let v = windows[displayID]?.selectionView, v.isEditingText {
+            // Committing reenters this controller through the delegate and rewrites `session`,
+            // so the local copy is stale from here on.
+            v.commitTextEditing()
+            guard let refreshed = session else { return }
+            s = refreshed
+        }
         let scale = snap.geometry.scale
         if s.activeDisplay != displayID || s.selection == nil {
             s.activeDisplay = displayID
@@ -446,9 +453,10 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             s.selection?.release()
         case .drawing(let id):
             if let shape = s.document.shape(id: id), shape.isDegenerate {
+                // The shape never really existed, so drop it and the record made on press.
+                // Clearing the whole history here would make every earlier mark un-undoable.
                 s.document.remove(id: id)
-                _ = s.history.undo(current: s.document)
-                s.history.clear()
+                s.history.discardLastRecord()
             }
         case .movingShape:
             break

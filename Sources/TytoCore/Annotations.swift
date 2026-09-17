@@ -97,7 +97,9 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
             return hypot(Double(end.x - start.x), Double(end.y - start.y)) < 4
         case .rect, .ellipse, .blur:
             let b = bounds
-            return b.width < 4 || b.height < 4
+            // Deliberately not `||`: a long, very thin rectangle is an underline, which is a
+            // shape somebody meant to draw.
+            return max(b.width, b.height) < 4
         case .text:
             return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .badge:
@@ -226,6 +228,13 @@ public struct History<State: Sendable>: Sendable {
         guard let s = future.popLast() else { return nil }
         past.append(current)
         return s
+    }
+
+    /// Drops the most recent recorded state without making it redoable. For a mutation that
+    /// turned out not to have happened, so its record should leave no trace either way.
+    /// Distinct from `clear()`, which throws away the whole history.
+    public mutating func discardLastRecord() {
+        _ = past.popLast()
     }
 
     public mutating func clear() {

@@ -17,6 +17,7 @@ enum Clipboard {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             pruneFileCopies()
             let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")   // fixed format needs a fixed locale
             f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
             let url = dir.appendingPathComponent("Tyto \(f.string(from: Date())).png")
             try png.write(to: url, options: .atomic)

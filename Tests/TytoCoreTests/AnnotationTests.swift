@@ -42,7 +42,9 @@ private let style = ShapeStyle(color: .red, strokeWidth: 4, fontSize: 32)
     }
 
     @Test func degenerateShapes() {
-        #expect(Shape(kind: .rect, start: PixelPoint(x: 5, y: 5), end: PixelPoint(x: 7, y: 40), style: style).isDegenerate)
+        // A 2x35 rectangle is a thin vertical marker, not a slip: 35px of travel was deliberate.
+        #expect(!Shape(kind: .rect, start: PixelPoint(x: 5, y: 5), end: PixelPoint(x: 7, y: 40), style: style).isDegenerate)
+        #expect(Shape(kind: .rect, start: PixelPoint(x: 5, y: 5), end: PixelPoint(x: 7, y: 7), style: style).isDegenerate)
         #expect(!Shape(kind: .rect, start: PixelPoint(x: 5, y: 5), end: PixelPoint(x: 50, y: 40), style: style).isDegenerate)
         #expect(Shape(kind: .arrow, start: PixelPoint(x: 5, y: 5), end: PixelPoint(x: 7, y: 6), style: style).isDegenerate)
         #expect(Shape(kind: .text, start: .zero, end: .zero, style: style, text: "  ").isDegenerate)
@@ -192,5 +194,44 @@ private let style = ShapeStyle(color: .red, strokeWidth: 4, fontSize: 32)
             }
         }
         #expect(reddish > 20, "some pixels in the text box must carry the text colour")
+    }
+}
+
+/// A near-flat drag used to wipe the whole undo stack: the degenerate-shape path called
+/// History.clear() when it only meant to drop the one record it had just made. And because
+/// "degenerate" tested either dimension, a long thin rectangle (an underline) triggered it.
+@Suite struct DegenerateDragTests {
+    @Test func discardingARecordLeavesEarlierHistoryIntact() {
+        var h = History<Int>()
+        var state = 0
+        h.record(state); state = 1      // a real edit
+        h.record(state); state = 2      // the edit that turns out to be degenerate
+        h.discardLastRecord()           // drop only that one
+        state = 1                       // caller reverses its own change
+        #expect(h.canUndo, "the earlier edit must still be undoable")
+        #expect(h.undo(current: state) == 0)
+    }
+
+    @Test func discardDoesNotResurrectRedo() {
+        var h = History<Int>()
+        var state = 0
+        h.record(state); state = 1
+        state = h.undo(current: state)!     // now redoable
+        #expect(h.canRedo)
+        h.record(state); state = 9
+        h.discardLastRecord()
+        #expect(!h.canRedo, "recording already cleared redo; discarding must not bring it back")
+    }
+
+    @Test func longThinShapesAreNotDegenerate() {
+        let style = ShapeStyle(color: .red, strokeWidth: 4, fontSize: 32)
+        // An underline: 500 wide, 3 tall. Somebody meant to draw this.
+        let underline = Shape(kind: .rect, start: PixelPoint(x: 0, y: 0),
+                              end: PixelPoint(x: 500, y: 3), style: style)
+        #expect(!underline.isDegenerate)
+        // A stray click that moved two pixels is not a shape.
+        let stray = Shape(kind: .rect, start: PixelPoint(x: 0, y: 0),
+                          end: PixelPoint(x: 2, y: 2), style: style)
+        #expect(stray.isDegenerate)
     }
 }

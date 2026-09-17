@@ -1,15 +1,47 @@
 # Tyto
 
-Fast region screenshot + annotation for macOS 27. See `PLAN.md`.
+Fast region screenshots with markup, for macOS. Press ⌘⇧9 and the screen freezes right away –
+so a menu, a tooltip, an animation stays exactly where it was while you pick what to keep.
+Drag a region, or click a window to grab just that one. Mark it up, press Return, paste it
+wherever you need.
+
+Named after the barn owl, *Tyto alba*. It also sounds like "отуто", Ukrainian for "right
+here", which is roughly what you mean when you drag a box around something.
+
+## No network, at all
+
+Tyto contains no networking code. Nothing is uploaded, no analytics, no account, no server.
+That claim is checkable rather than a promise – `grep -r URLSession Sources/` comes back
+empty, and the app is sandboxed with only four entitlements: the sandbox itself, read/write
+to Pictures, user-selected files for the save panel, and app-scoped bookmarks so a chosen
+save folder survives a restart.
+
+## Building
+
+Requires macOS 27 and Xcode 27.
 
 ```bash
-swift test                    # TytoCore unit tests
-scripts/dev.sh                # build Tyto.app, sign, relaunch, ping the debug socket
-scripts/e2e-phase2.sh         # drive the real app on the secondary display, PNGs in out/
-.build/debug/tytoctl --help
-.build/debug/tytoctl container  # sandbox container; the debug socket lives in <container>/tmp
+swift test              # TytoCore: geometry, the selection state machine, the renderer
+scripts/dev.sh          # build Tyto.app, sign it, relaunch, wait for the debug socket
+scripts/e2e-phase2.sh   # drive the real app on a second display; PNGs land in out/
+scripts/gen-project.sh  # generate Tyto.xcodeproj from project.yml (for archiving)
 ```
 
-Every build is sandboxed (`Resources/Tyto.entitlements`); see `docs/mac-app-store.md`.
+`scripts/build-app.sh` signs with a Developer ID certificate if one is in the keychain, and
+ad-hoc otherwise. macOS ties the Screen Recording grant to the signature, so an ad-hoc build
+has to be re-approved on every rebuild.
 
-Default hotkey: ⌘⇧9. Esc cancels, Enter or ⌘C copies the selection to the clipboard.
+## Layout
+
+- `Sources/TytoCore` – pure model: geometry, the selection state machine, the annotation
+  document, undo history, and the renderer. No AppKit, and this is what the tests cover.
+- `Sources/Tyto` – the app: capture, the overlay windows, the toolbar, settings.
+- `Sources/tytoctl` – a debug CLI that drives a running debug build over a unix socket, so
+  the AppKit layer can be exercised end to end rather than mocked. Compiled out of Release.
+
+One renderer draws both the live overlay and the exported image, so what you see on screen is
+what lands on the clipboard, by construction rather than by vigilance.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
