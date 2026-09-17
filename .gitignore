@@ -10,3 +10,8 @@ Tyto.xcodeproj/
 # Downloaded webfont used only to render marketing panels
 design/fonts/
 design/*.html
+
+# Working notes: the plan, the App Store research and the unpublished listing copy.
+# Kept on disk, deliberately not published.
+PLAN.md
+docs/
