@@ -1,6 +1,6 @@
 #!/bin/bash
 # End-to-end check of capture -> overlay -> selection -> copy, confined to the secondary display.
-# Produces PNGs in out/ that a human (or Claude) can look at.
+# Produces PNGs in out/ to inspect by eye.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CTL="$(cd "$ROOT" && swift build -c "${CONFIG:-debug}" --show-bin-path)/tytoctl"
