@@ -18,7 +18,7 @@ save folder survives a restart.
 
 ## Building
 
-Requires macOS 27 and Xcode 27.
+Requires macOS 26 or later. Build with Xcode 27.
 
 ```bash
 swift test              # TytoCore: geometry, the selection state machine, the renderer

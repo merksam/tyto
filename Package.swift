@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Tyto",
-    platforms: [.macOS("27.0")],
+    platforms: [.macOS("26.0")],
     targets: [
         // Pure model + geometry, no AppKit. Unit-tested.
         .target(name: "TytoCore"),

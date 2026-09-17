@@ -87,7 +87,11 @@ final class SelectionView: NSView, NSGestureRecognizerDelegate {
         for l in [dimLayer, borderLayer, handlesLayer, sizeLabel] { root.addSublayer(l) }
 
         let pan = NSPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-        pan.isCancellableByScrollGesture = false
+        if #available(macOS 27.0, *) {
+            // Stops a trackpad scroll from cancelling a selection drag. Absent on 26, where
+            // the recogniser simply keeps its default behaviour.
+            pan.isCancellableByScrollGesture = false
+        }
         pan.delegate = self
         addGestureRecognizer(pan)
         let click = NSClickGestureRecognizer(target: self, action: #selector(handleClick(_:)))

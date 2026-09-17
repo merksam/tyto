@@ -23,7 +23,7 @@ cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 if [ -d "$ROOT/Resources/Assets.xcassets" ]; then
   xcrun actool "$ROOT/Resources/Assets.xcassets" \
     --compile "$APP/Contents/Resources" \
-    --platform macosx --minimum-deployment-target 27.0 \
+    --platform macosx --minimum-deployment-target 26.0 \
     --app-icon AppIcon --output-partial-info-plist "$(mktemp -t tyto-actool)" >/dev/null 2>&1 || \
     echo "actool failed; bundle will have no icon" 1>&2
 fi

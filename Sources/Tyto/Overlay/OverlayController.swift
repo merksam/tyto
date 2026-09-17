@@ -111,7 +111,11 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         session = s
 
         if options.interactive {
-            NSApp.presentationOptions = [.autoHideDock, .autoHideMenuBar, .disableScreenCornerInteractions]
+            // Hot-corner suppression is macOS 27 only; on 26 a drag into a corner can still
+            // trigger Mission Control, which is a nuisance rather than a failure.
+            var presentation: NSApplication.PresentationOptions = [.autoHideDock, .autoHideMenuBar]
+            if #available(macOS 27.0, *) { presentation.insert(.disableScreenCornerInteractions) }
+            NSApp.presentationOptions = presentation
             NSApp.activate()
             if !NSApp.isActive {
                 // Cooperative activation can be refused; without key status Esc would never arrive.

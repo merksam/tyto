@@ -6,7 +6,7 @@ name: Tyto
 options:
   bundleIdPrefix: com.yevhenii
   deploymentTarget:
-    macOS: "27.0"
+    macOS: "26.0"
   createIntermediateGroups: true
   generateEmptyDirectories: false
 
@@ -17,7 +17,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     ENABLE_HARDENED_RUNTIME: YES
     ARCHS: arm64
-    MACOSX_DEPLOYMENT_TARGET: "27.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
 
 targets:
   # TytoCore is compiled as its own target rather than pulled in through the SwiftPM package:

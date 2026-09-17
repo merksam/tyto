@@ -34,7 +34,10 @@ final class ToolbarView: NSView {
         wantsLayer = true
 
         glass.style = .regular
-        glass.effectIsInteractive = true
+        if #available(macOS 27.0, *) {
+            // Glass responds to clicks. Cosmetic; on 26 the effect is simply static.
+            glass.effectIsInteractive = true
+        }
         glass.cornerRadius = 16
 
         configureSegments()
