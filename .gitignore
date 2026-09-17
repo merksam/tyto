@@ -15,3 +15,10 @@ design/*.html
 # Kept on disk, deliberately not published.
 PLAN.md
 docs/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
