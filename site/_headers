@@ -1,0 +1,7 @@
+# Cloudflare Pages honours this file. The pages are static and carry no user data;
+# these headers just close off the obvious footguns.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(), camera=(), microphone=()
