@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tyto — fast screenshots for macOS</title>
+<meta name="description" content="Tyto takes a screenshot the instant you press the shortcut, then gets out of your way.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --deep: #0b1410; --forest: #14392c; --mint: #9fd6b4; --paper: #f2f7f3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--deep); color: var(--paper);
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--mint); }
+  a:hover { color: #c2e8d1; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  header { background: var(--forest); padding: 72px 0 64px; }
+  .eyebrow {
+    font-size: 12px; font-weight: 500; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--mint); margin-bottom: 18px;
+  }
+  h1 { font-size: clamp(34px, 6vw, 54px); font-weight: 700; letter-spacing: -.03em; line-height: 1.05; margin: 0; }
+  .lede { font-size: clamp(17px, 2.4vw, 20px); color: rgba(242,247,243,.7); margin-top: 18px; max-width: 34em; }
+  main { padding: 56px 0 80px; }
+  h2 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; margin: 44px 0 14px; }
+  h2:first-child { margin-top: 0; }
+  ul { padding-left: 20px; margin: 0; }
+  li { margin: 8px 0; color: rgba(242,247,243,.82); }
+  .kbd {
+    font-size: .92em; padding: 2px 7px; border-radius: 5px;
+    background: rgba(159,214,180,.13); border: 1px solid rgba(159,214,180,.25);
+    color: var(--paper); white-space: nowrap;
+  }
+  footer {
+    border-top: 1px solid rgba(159,214,180,.16); padding: 28px 0 60px;
+    color: rgba(242,247,243,.5); font-size: 14px;
+  }
+  footer a { margin-right: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">macOS</div>
+    <h1>Tyto</h1>
+    <p class="lede">Takes a screenshot the instant you press the shortcut, then gets out of your way.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2>What it does</h2>
+  <p>Press <span class="kbd">⌘⇧9</span> and the screen freezes immediately, so a menu, a tooltip
+  or an animation stays exactly where it was while you choose what to keep. Drag a region, or
+  click a window to grab it precisely.</p>
+  <ul>
+    <li>Mark it up in place: arrows, boxes, ellipses, lines, text, blur and numbered steps</li>
+    <li>Press <span class="kbd">⏎</span> to copy, then paste anywhere. <span class="kbd">⌘S</span> saves a PNG instead</li>
+    <li>Optional history of every capture, reachable from the menu bar</li>
+    <li>Configurable shortcut, and default tool, colour and thickness</li>
+  </ul>
+
+  <h2>Support</h2>
+  <p>Found a bug, or something behaving oddly? Open an issue and describe what you did and what
+  happened. Please include your macOS version.</p>
+  <ul>
+    <li><a href="https://github.com/merksam/owl/issues">Report an issue on GitHub</a></li>
+  </ul>
+
+  <h2>Privacy</h2>
+  <p>Tyto makes no network connections and collects no data. Your captures never leave your Mac.
+  The full statement is on the <a href="./privacy.html">privacy page</a>.</p>
+
+  <h2>Requirements</h2>
+  <p>macOS 27 or later, on a Mac with Apple silicon. Tyto needs Screen Recording permission,
+  which macOS requires of every app that captures the screen. Grant it in System Settings under
+  Privacy &amp; Security, then relaunch Tyto.</p>
+</main>
+
+<footer class="wrap">
+  <a href="./privacy.html">Privacy</a>
+  <a href="https://github.com/merksam/owl/issues">Support</a>
+</footer>
+</body>
+</html>

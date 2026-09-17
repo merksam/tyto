@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Tyto</title>
+<meta name="description" content="Tyto collects no data and makes no network connections.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap">
+<style>
+  :root { --deep: #0b1410; --forest: #14392c; --mint: #9fd6b4; --paper: #f2f7f3; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--deep); color: var(--paper);
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--mint); } a:hover { color: #c2e8d1; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  header { background: var(--forest); padding: 56px 0 48px; }
+  h1 { font-size: clamp(28px, 5vw, 42px); font-weight: 700; letter-spacing: -.02em; margin: 0; }
+  .date { color: rgba(242,247,243,.6); font-size: 14px; margin-top: 10px; }
+  main { padding: 48px 0 80px; }
+  h2 { font-size: 20px; font-weight: 700; margin: 38px 0 12px; }
+  h2:first-child { margin-top: 0; }
+  p, li { color: rgba(242,247,243,.82); }
+  ul { padding-left: 20px; }
+  footer {
+    border-top: 1px solid rgba(159,214,180,.16); padding: 26px 0 60px;
+    color: rgba(242,247,243,.5); font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Privacy Policy</h1>
+    <div class="date">Tyto for macOS · Last updated 17 September 2026</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2>The short version</h2>
+  <p>Tyto collects nothing. It makes no network connections of any kind. There is no account,
+  no analytics, no crash reporting and no server. Nothing you capture is transmitted anywhere.</p>
+
+  <h2>What stays on your Mac</h2>
+  <ul>
+    <li><strong>Captures.</strong> Images you take go to your clipboard and, if you turn that
+    option on, to a folder you choose. They are ordinary files on your own disk.</li>
+    <li><strong>Settings.</strong> Your shortcut, default tool, colour, thickness and save
+    location are stored locally by macOS in Tyto's own container.</li>
+    <li><strong>Recent captures.</strong> If enabled, Tyto remembers the file paths of your
+    recent captures so it can list them in the menu bar. The list is local.</li>
+  </ul>
+
+  <h2>Permissions</h2>
+  <p>Tyto asks for Screen Recording permission because macOS requires it of every app that
+  captures the screen. Tyto uses it to take a single still image when you press the shortcut.
+  It does not record video, and it does not capture anything in the background.</p>
+  <p>If you choose a save folder outside your Pictures folder, macOS grants Tyto access to that
+  folder specifically, and Tyto stores that grant so the folder keeps working after a restart.</p>
+
+  <h2>Third parties</h2>
+  <p>There are none. Tyto contains no advertising, no tracking libraries and no third-party
+  analytics, and it shares no information with anyone.</p>
+
+  <h2>Children</h2>
+  <p>Tyto collects no personal information from anyone, including children under 13.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy ever changes, the revised version will be posted here with a new date. Any
+  change that affects data handling will also be described in the app's release notes.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about privacy, or anything else, can go to
+  <a href="https://github.com/merksam/owl/issues">the issue tracker</a>.</p>
+</main>
+
+<footer class="wrap"><a href="./index.html">Back to Tyto</a></footer>
+</body>
+</html>
