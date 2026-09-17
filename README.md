@@ -1,5 +1,7 @@
 # Tyto
 
+![Tyto: press the shortcut, drag a region, mark it up, paste it](.github/media/demo.gif)
+
 Fast region screenshots with markup, for macOS. Press ⌘⇧9 and the screen freezes right away –
 so a menu, a tooltip, an animation stays exactly where it was while you pick what to keep.
 Drag a region, or click a window to grab just that one. Mark it up, press Return, paste it
@@ -41,6 +43,16 @@ has to be re-approved on every rebuild.
 
 One renderer draws both the live overlay and the exported image, so what you see on screen is
 what lands on the clipboard, by construction rather than by vigilance.
+
+## A published app, not a project looking for contributors
+
+Tyto is a finished thing I use every day, released free on the Mac App Store. The source is
+here so the claim above is checkable, not because the repo needs maintainers. Bug reports are
+welcome in [Issues](https://github.com/merksam/tyto/issues); pull requests may sit for a
+while, so please open an issue before writing one.
+
+If it saves you time, there is a Sponsor button at the top of this page, and
+[Ko-fi](https://ko-fi.com/merksam) if you prefer. Entirely optional – nothing in the app asks.
 
 ## Licence
 
