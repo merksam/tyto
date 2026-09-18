@@ -37,6 +37,11 @@
     font-size: 14px; font-weight: 500;
   }
   .cta-note { font-size: 14px; color: rgba(242,247,243,.55); }
+  .demo {
+    display: block; width: 100%; height: auto; border-radius: 10px;
+    border: 1px solid rgba(159,214,180,.16); background: #0f1b16;
+  }
+  .demo-cap { font-size: 13px; color: rgba(242,247,243,.45); margin: 12px 0 0; }
   main.wrap { padding: 96px 24px 104px; }
   h2 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; margin: 44px 0 14px; }
   h2:first-child { margin-top: 0; }
@@ -74,6 +79,13 @@
 </header>
 
 <main class="wrap">
+  <video class="demo" width="880" height="550" autoplay loop muted playsinline
+         aria-label="Tyto capturing a region of a document, then adding a box, an arrow, a text
+                     label and pixelating an email column before the image is copied.">
+    <source src="./demo.mp4" type="video/mp4">
+  </video>
+  <p class="demo-cap">Shortcut, drag, mark up, copy.</p>
+
   <h2>What it does</h2>
   <p>Press <span class="kbd">⌘⇧9</span> and the screen freezes immediately, so a menu, a tooltip
   or an animation stays exactly where it was while you choose what to keep. Drag a region, or
@@ -106,5 +118,16 @@
   <a href="./privacy.html">Privacy</a>
   <a href="https://github.com/merksam/tyto/issues">Support</a>
 </footer>
+
+<script>
+  // A looping demo is motion nobody asked for. Honour the system setting: stop it and hand
+  // over the controls instead, so the video is still there for anyone who wants it.
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    var demo = document.querySelector('.demo');
+    demo.removeAttribute('autoplay');
+    demo.pause();
+    demo.controls = true;
+  }
+</script>
 </body>
 </html>
