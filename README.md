@@ -1,29 +1,58 @@
 # Tyto
 
-![Tyto: press the shortcut, drag a region, mark it up, paste it](.github/media/demo.gif)
+![Screen recording: dragging a region, adding an arrow and a pixelated block, then pasting the result into another app](.github/media/demo.gif)
 
-Fast region screenshots with markup, for macOS. Press ⌘⇧9 and the screen freezes right away –
-so a menu, a tooltip, an animation stays exactly where it was while you pick what to keep.
-Drag a region, or click a window to grab just that one. Mark it up, press Return, paste it
-wherever you need.
+Region screenshots with markup, for macOS. Press ⌘⇧9 and the screen freezes immediately, so an
+open menu or a mid-flight animation stays put while you pick what to keep. Drag a region, or
+click a window to grab just that one. Mark it up, press Return, and it is on the clipboard.
 
 Named after the barn owl, *Tyto alba*. It also sounds like "отуто", Ukrainian for "right
 here", which is roughly what you mean when you drag a box around something.
 
+## Download
+
+Coming to the Mac App Store. Free, macOS 26 or later, Apple silicon.
+
+<!-- On release, replace the line above with:
+[![Download Tyto on the Mac App Store](.github/media/mac-app-store-badge.svg)](https://apps.apple.com/app/id6812734653)
+-->
+
+macOS asks for Screen Recording permission the first time. Grant it and relaunch.
+
+## What it does
+
+- Drag a region, or click a window to take just that window
+- Seven drawing tools: box, ellipse, line, arrow, text, pixelate, numbered badges
+- Return copies to the clipboard, ⌘S writes a PNG
+- Every capture is also saved to `~/Pictures/Tyto`, last 24 in the menu bar, and it can be
+  turned off
+- Configurable shortcut, and default tool, colour and thickness
+
 ## No network, at all
 
-Tyto contains no networking code. Nothing is uploaded, no analytics, no account, no server.
-That claim is checkable rather than a promise – `grep -r URLSession Sources/` comes back
-empty, and the app is sandboxed with only four entitlements: the sandbox itself, read/write
-to Pictures, user-selected files for the save panel, and app-scoped bookmarks so a chosen
-save folder survives a restart.
+Tyto contains no networking code. No uploads, no analytics, no account.
+`grep -r URLSession Sources/` comes back empty, and the app is sandboxed with only four
+entitlements: the sandbox itself, read/write to Pictures, user-selected files for the save
+panel, and app-scoped bookmarks so a chosen save folder survives a restart.
+
+The full privacy statement is at [tyto.random.travel](https://tyto.random.travel/privacy.html).
+
+## Contributing
+
+Tyto is a finished thing I use every day, released free on the Mac App Store. The source is
+here so you can check that yourself, not because the repo needs maintainers. Bug reports are
+welcome in [Issues](https://github.com/merksam/tyto/issues); pull requests may sit for a
+while, so please open an issue before writing one.
+
+If it saves you time, there is a Sponsor button at the top of this page, and
+[Ko-fi](https://ko-fi.com/merksam) if you prefer. Entirely optional – nothing in the app asks.
 
 ## Building
 
 Requires macOS 26 or later. Build with Xcode 27.
 
 ```bash
-swift test              # TytoCore: geometry, the selection state machine, the renderer
+swift test              # unit tests, TytoCore only, no AppKit needed
 scripts/dev.sh          # build Tyto.app, sign it, relaunch, wait for the debug socket
 scripts/e2e-phase2.sh   # drive the real app on a second display; PNGs land in out/
 scripts/gen-project.sh  # generate Tyto.xcodeproj from project.yml (for archiving)
@@ -35,24 +64,14 @@ has to be re-approved on every rebuild.
 
 ## Layout
 
-- `Sources/TytoCore` – pure model: geometry, the selection state machine, the annotation
+- `Sources/TytoCore`: pure model. Geometry, the selection state machine, the annotation
   document, undo history, and the renderer. No AppKit, and this is what the tests cover.
-- `Sources/Tyto` – the app: capture, the overlay windows, the toolbar, settings.
-- `Sources/tytoctl` – a debug CLI that drives a running debug build over a unix socket, so
-  the AppKit layer can be exercised end to end rather than mocked. Compiled out of Release.
+- `Sources/Tyto`: the app. Capture, the overlay windows, the toolbar, settings.
+- `Sources/tytoctl`: a debug CLI that drives a running debug build over a unix socket, so the
+  tests drive the real AppKit layer end to end. Compiled out of Release.
 
-One renderer draws both the live overlay and the exported image, so what you see on screen is
-what lands on the clipboard, by construction rather than by vigilance.
-
-## A published app, not a project looking for contributors
-
-Tyto is a finished thing I use every day, released free on the Mac App Store. The source is
-here so the claim above is checkable, not because the repo needs maintainers. Bug reports are
-welcome in [Issues](https://github.com/merksam/tyto/issues); pull requests may sit for a
-while, so please open an issue before writing one.
-
-If it saves you time, there is a Sponsor button at the top of this page, and
-[Ko-fi](https://ko-fi.com/merksam) if you prefer. Entirely optional – nothing in the app asks.
+One renderer draws both the live overlay and the exported image, so the export cannot drift
+from the preview. There is only one path.
 
 ## Licence
 
