@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the README demo loop: hotkey, freeze, drag, annotate, copy.
+# Builds the README demo loop: hotkey, freeze, drag, annotate, pixelate, copy.
 #
 # Frames are staged and captured one at a time rather than screen-recorded, so the timing is
 # exact, nothing of the real desktop appears, and the result is reproducible.
@@ -53,6 +53,11 @@ frame 3
 q color red; q tool arrow; q draw 3350 1230 3810 1440
 frame 3
 q color red; q width thick; q tool text; q text 2850 1150 "best week yet"
+frame 4
+
+# 5. Pixelate the email column. The stage's table is the reason it is there: the effect only
+#    reads as an effect when it lands on something you can see it destroy.
+q tool blur; q draw 2552 1900 3280 2084
 frame 10
 
 q cancel
