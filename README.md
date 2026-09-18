@@ -44,8 +44,12 @@ here so you can check that yourself, not because the repo needs maintainers. Bug
 welcome in [Issues](https://github.com/merksam/tyto/issues); pull requests may sit for a
 while, so please open an issue before writing one.
 
-If it saves you time, there is a Sponsor button at the top of this page, and
-[Ko-fi](https://ko-fi.com/merksam) if you prefer. Entirely optional – nothing in the app asks.
+If it saves you time:
+
+[![Support me on Ko-fi](https://img.shields.io/badge/Ko--fi-support-2E7D5B?style=flat-square&logo=kofi&logoColor=white)](https://ko-fi.com/merksam)
+[![Sponsor on GitHub](https://img.shields.io/badge/GitHub-sponsor-2E7D5B?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/merksam)
+
+Entirely optional – nothing in the app asks.
 
 ## Building
 
