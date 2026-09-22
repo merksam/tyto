@@ -43,9 +43,22 @@ enum Settings {
     /// folder across launches from a plain path, so the bookmark is the stored form.
     private static let bookmarkKey = "saveDirectoryBookmark"
 
-    /// Always reachable: the container's Pictures symlink plus the pictures entitlement cover it.
+    /// The user's real ~/Pictures/Tyto, reachable through the pictures entitlement.
+    ///
+    /// Not `FileManager.urls(for: .picturesDirectory)`: under the sandbox that returns the
+    /// container's own Pictures folder, `~/Library/Containers/<id>/Data/Pictures`, a hidden
+    /// location users never see. App Review rejected 1.0 (2) for exactly that under Guideline
+    /// 2.4.5(i): the container is for the app's files, not the user's documents. The real home
+    /// comes from the passwd database, which the sandbox does not rewrite.
     static var defaultSaveDirectory: URL {
-        FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+        let home: String
+        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
+            home = String(cString: dir)
+        } else {
+            home = NSHomeDirectory()
+        }
+        return URL(fileURLWithPath: home, isDirectory: true)
+            .appendingPathComponent("Pictures", isDirectory: true)
             .appendingPathComponent("Tyto", isDirectory: true)
     }
 
@@ -55,7 +68,8 @@ enum Settings {
 
     static var hasCustomSaveDirectory: Bool { d.data(forKey: bookmarkKey) != nil }
 
-    /// For display and JSON: the container's Pictures symlink resolved to its real path.
+    /// For display and JSON. The default is already a real path; a chosen folder may still
+    /// arrive through a symlink, so resolve for the user's benefit.
     static var saveDirectoryDisplayPath: String { saveDirectory.resolvingSymlinksInPath().path }
 
     /// Passing nil reverts to the default folder. Throws if the app cannot reach `url` (which is
