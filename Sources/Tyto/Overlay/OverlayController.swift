@@ -608,9 +608,10 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         case 51, 117: // Delete, forward delete
             deleteSelectedShape()
         default:
+            // Match the physical key, not the typed character, so the shortcut follows the
+            // keycap under any keyboard layout. See Tool.keyCode.
             let mods = event.modifierFlags.intersection([.command, .control, .option])
-            guard mods.isEmpty, let ch = event.charactersIgnoringModifiers?.lowercased(),
-                  let t = Tool.allCases.first(where: { $0.key == ch }) else { return }
+            guard mods.isEmpty, let t = Tool(keyCode: event.keyCode) else { return }
             setTool(t)
         }
     }
@@ -618,18 +619,18 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     func selectionView(_ view: SelectionView, keyEquivalent event: NSEvent) -> Bool {
         guard !view.isEditingText else { return false }
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let ch = event.charactersIgnoringModifiers?.lowercased()
-        switch (mods, ch) {
-        case (.command, "c"):
+        // Physical keys (kVK_ANSI_C/S/Z), so ⌘C, ⌘S and ⌘Z work under any keyboard layout.
+        switch (mods, event.keyCode) {
+        case (.command, 8): // C
             do { try copy() } catch { Log.overlay.error("copy failed: \(String(describing: error))") }
             return true
-        case (.command, "s"):
+        case (.command, 1): // S
             save()
             return true
-        case (.command, "z"):
+        case (.command, 6): // Z
             undo()
             return true
-        case ([.command, .shift], "z"):
+        case ([.command, .shift], 6): // ⇧Z
             redo()
             return true
         default:
