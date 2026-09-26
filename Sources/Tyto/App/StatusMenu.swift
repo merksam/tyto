@@ -9,6 +9,34 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let recentMenu = NSMenu()
     private let onCapture: () -> Void
     private let onOpenSettings: () -> Void
+    private var hintPopover: NSPopover?
+
+    /// A short note anchored to the status item itself, so the arrow points at the real owl
+    /// wherever the menu bar has put it. Goes away on its own or on a click elsewhere.
+    func showHint(_ text: String, for seconds: TimeInterval = 8) {
+        guard let button = item.button else { return }
+        hintPopover?.performClose(nil)
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = .systemFont(ofSize: 13)
+        label.alignment = .center
+        label.frame = NSRect(x: 14, y: 12, width: 232, height: 40)
+        label.autoresizingMask = [.width, .height]
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 64))
+        container.addSubview(label)
+        let vc = NSViewController()
+        vc.view = container
+        let popover = NSPopover()
+        // Not .transient: that closes the moment the app is not active, and an accessory app
+        // never is. The timer below takes it down instead.
+        popover.behavior = .applicationDefined
+        popover.contentViewController = vc
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        hintPopover = popover
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self, weak popover] in
+            guard let popover, self?.hintPopover === popover else { return }
+            popover.performClose(nil)
+        }
+    }
 
     init(onCapture: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
         self.onCapture = onCapture

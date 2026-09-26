@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import TytoCore
 
 enum Tool: String, CaseIterable, Sendable {
@@ -30,7 +31,7 @@ enum Tool: String, CaseIterable, Sendable {
         }
     }
 
-    /// Single-letter keyboard shortcut while the overlay is up.
+    /// Single-letter keyboard shortcut while the overlay is up, as shown in the toolbar tooltip.
     var key: String {
         switch self {
         case .select: "v"
@@ -42,6 +43,27 @@ enum Tool: String, CaseIterable, Sendable {
         case .blur: "b"
         case .badge: "n"
         }
+    }
+
+    /// The physical key for `key`. Matching on this rather than on the typed character means
+    /// the shortcut follows the keycap, so it works under Cyrillic and other non-Latin layouts,
+    /// where the A key types "ф" and a character comparison never fires.
+    var keyCode: UInt16 {
+        switch self {
+        case .select: UInt16(kVK_ANSI_V)
+        case .rect: UInt16(kVK_ANSI_R)
+        case .ellipse: UInt16(kVK_ANSI_E)
+        case .line: UInt16(kVK_ANSI_L)
+        case .arrow: UInt16(kVK_ANSI_A)
+        case .text: UInt16(kVK_ANSI_T)
+        case .blur: UInt16(kVK_ANSI_B)
+        case .badge: UInt16(kVK_ANSI_N)
+        }
+    }
+
+    init?(keyCode: UInt16) {
+        guard let t = Tool.allCases.first(where: { $0.keyCode == keyCode }) else { return nil }
+        self = t
     }
 
     var shapeKind: ShapeKind? {

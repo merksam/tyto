@@ -25,6 +25,7 @@ enum DebugCommands {
                 "screenCapturePermission": .bool(Permissions.hasScreenCapture),
                 "sessionActive": .bool(overlay.isActive),
                 "settingsWindowVisible": .bool(app.isSettingsWindowVisible),
+                "welcomeWindowVisible": .bool(app.isWelcomeWindowVisible),
             ])
 
         case "displays":
@@ -244,6 +245,14 @@ enum DebugCommands {
 
         case "timings":
             return .success(overlay.lastTimings.json)
+
+        case "welcome":
+            app.openWelcome()
+            return .success()
+
+        case "hint":
+            app.showHint(req.value ?? "Tyto lives here.")
+            return .success()
 
         case "quit":
             DispatchQueue.main.async { NSApp.terminate(nil) }

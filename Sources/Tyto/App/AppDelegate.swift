@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenu: StatusMenu?
     private var hotkey: GlobalHotkey?
     private var settingsWindowController: SettingsWindowController?
+    private var welcomeWindowController: WelcomeWindowController?
     #if DEBUG
     private var debugServer: DebugServer?
     #endif
@@ -14,8 +15,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         overlay = OverlayController(capturer: capturer)
-        overlay.onSessionEnd = { outcome in
+        overlay.onSessionEnd = { [weak self] outcome in
             Log.overlay.info("session ended: \(String(describing: outcome))")
+            // A finished capture is the real end of onboarding: the permission is granted and
+            // the user has found the shortcut. Nothing left to explain.
+            switch outcome {
+            case .copied, .saved: self?.markOnboarded()
+            case .cancelled: break
+            }
         }
         statusMenu = StatusMenu(onCapture: { [weak self] in self?.requestCapture() },
                                 onOpenSettings: { [weak self] in self?.openSettings() })
@@ -35,12 +42,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
 
-        // A menu-bar-only app that shows nothing but a TCC prompt reads as "no UI" to App Review,
-        // so on the very first launch open Settings first; the prompt then lands over a window.
-        // The permission itself is requested on the first capture attempt, not here.
+        // Onboarding, until the first finished capture. `hasLaunchedBefore` is set by
+        // markOnboarded(), not here: someone who quits during the permission prompt should
+        // see this again next time, not be left with an app that silently does nothing.
         if !UserDefaults.standard.bool(forKey: Self.hasLaunchedBeforeKey) {
-            UserDefaults.standard.set(true, forKey: Self.hasLaunchedBeforeKey)
-            openSettings()
+            let granted = Permissions.hasScreenCapture
+            if !granted {
+                // Also what App Review sees first: a real window, with the permission prompt
+                // landing over it rather than over nothing.
+                openWelcome()
+            }
+            // The status item's button has no window yet at this point, and NSPopover.show does
+            // nothing at all when anchored to a view that is not on screen. Wait a beat.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.showHint(granted
+                    ? "Tyto is ready. Press \(Settings.hotKeyDisplay) to take a screenshot."
+                    : "Tyto lives here.")
+            }
         }
         Clipboard.pruneFileCopies()
         Log.app.info("Tyto launched (pid \(getpid()))")
@@ -67,6 +85,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func openSettings() {
         if settingsWindowController == nil { settingsWindowController = SettingsWindowController() }
         settingsWindowController?.show()
+    }
+
+    var isWelcomeWindowVisible: Bool { welcomeWindowController?.isVisible ?? false }
+
+    func openWelcome() {
+        if welcomeWindowController == nil { welcomeWindowController = WelcomeWindowController() }
+        welcomeWindowController?.show(openSettings: { [weak self] in self?.openSettings() })
+    }
+
+    func showHint(_ text: String) { statusMenu?.showHint(text) }
+
+    /// Onboarding is over: remember it and take the welcome window down if it is still up.
+    func markOnboarded() {
+        UserDefaults.standard.set(true, forKey: Self.hasLaunchedBeforeKey)
+        welcomeWindowController?.close()
     }
 
     /// Hotkey / menu entry point: the interactive, all-displays session.
