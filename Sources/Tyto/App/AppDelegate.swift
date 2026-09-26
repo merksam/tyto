@@ -29,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registerHotkey()
         NotificationCenter.default.addObserver(self, selector: #selector(hotkeyChanged),
                                                name: Settings.hotkeyChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(screenCaptureGranted),
+                                               name: Permissions.screenCaptureGranted, object: nil)
 
         #if DEBUG
         do {
@@ -73,6 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func hotkeyChanged() { registerHotkey() }
 
+    /// The grant landed while running. Say so at the icon; the welcome window, if up, already
+    /// shows Allowed and stays until the first capture or Done.
+    @objc private func screenCaptureGranted() {
+        showHint("Tyto is ready. Press \(Settings.hotKeyDisplay) to take a screenshot.")
+    }
+
     func registerHotkey() {
         hotkey?.unregister()
         hotkey = GlobalHotkey(keyCode: Settings.hotKeyCode, modifiers: Settings.hotKeyModifiers) { [weak self] in
@@ -106,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Pressing the hotkey while a session is up cancels it: Carbon hotkeys work regardless of
     /// focus, so this is the escape hatch if the overlay ever fails to become key.
     func requestCapture() {
+        statusMenu?.closeHint()
         if overlay.isActive {
             overlay.cancel()
             return

@@ -26,6 +26,7 @@ enum DebugCommands {
                 "sessionActive": .bool(overlay.isActive),
                 "settingsWindowVisible": .bool(app.isSettingsWindowVisible),
                 "welcomeWindowVisible": .bool(app.isWelcomeWindowVisible),
+                "screenCaptureGrantedDuringRun": .bool(Permissions.grantedDuringThisRun),
             ])
 
         case "displays":
