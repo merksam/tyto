@@ -11,11 +11,9 @@ here", which is roughly what you mean when you drag a box around something.
 
 ## Download
 
-Coming to the Mac App Store. Free, macOS 26 or later, Apple silicon.
-
-<!-- On release, replace the line above with:
 [![Download Tyto on the Mac App Store](.github/media/mac-app-store-badge.svg)](https://apps.apple.com/app/id6812734653)
--->
+
+Free. macOS 26 or later, on a Mac with Apple silicon.
 
 macOS asks for Screen Recording permission the first time. Grant it and relaunch.
 
