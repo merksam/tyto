@@ -17,7 +17,16 @@ import SwiftUI
     @Published var saveDirectory = Settings.saveDirectoryDisplayPath
     @Published var hasCustomSaveDirectory = Settings.hasCustomSaveDirectory
 
-    func refreshPermissionState() { screenCaptureGranted = Permissions.hasScreenCapture }
+    /// Called when the window is shown and whenever the app becomes active, which is what
+    /// happens when the user comes back from System Settings. If the cached answer is still no,
+    /// ask ScreenCaptureKit, which knows about a grant made while the app is running.
+    func refreshPermissionState() {
+        screenCaptureGranted = Permissions.hasScreenCapture
+        guard !screenCaptureGranted else { return }
+        Task { [weak self] in
+            if await Permissions.probeScreenCapture() { self?.screenCaptureGranted = true }
+        }
+    }
 
     func chooseSaveDirectory() {
         let panel = NSOpenPanel()
@@ -61,7 +70,7 @@ struct SettingsView: View {
                     }
                 }
                 if !model.screenCaptureGranted {
-                    Text("Tyto needs Screen Recording to capture the screen. Relaunch Tyto after granting it.")
+                    Text("Tyto needs Screen Recording to capture the screen. Grant it in System Settings; this updates on its own.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }

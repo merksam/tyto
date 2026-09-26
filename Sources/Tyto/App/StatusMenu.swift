@@ -19,15 +19,20 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         let label = NSTextField(wrappingLabelWithString: text)
         label.font = .systemFont(ofSize: 13)
         label.alignment = .center
-        label.frame = NSRect(x: 14, y: 12, width: 232, height: 40)
-        label.autoresizingMask = [.width, .height]
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 64))
+        // Size to the text: one short line gets one short line, not a 64pt box around it.
+        let maxTextWidth: CGFloat = 232
+        let fit = label.sizeThatFits(NSSize(width: maxTextWidth, height: .greatestFiniteMagnitude))
+        let textWidth = min(maxTextWidth, ceil(fit.width))
+        label.frame = NSRect(x: 14, y: 10, width: textWidth, height: ceil(fit.height))
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: textWidth + 28, height: ceil(fit.height) + 20))
         container.addSubview(label)
+        // A click on the note itself dismisses it; the status item and the hotkey do too.
+        container.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(closeHint)))
         let vc = NSViewController()
         vc.view = container
         let popover = NSPopover()
         // Not .transient: that closes the moment the app is not active, and an accessory app
-        // never is. The timer below takes it down instead.
+        // never is. Clicks and the timer below take it down instead.
         popover.behavior = .applicationDefined
         popover.contentViewController = vc
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
@@ -36,6 +41,15 @@ final class StatusMenu: NSObject, NSMenuDelegate {
             guard let popover, self?.hintPopover === popover else { return }
             popover.performClose(nil)
         }
+    }
+
+    @objc func closeHint() {
+        hintPopover?.performClose(nil)
+        hintPopover = nil
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        if menu == self.menu { closeHint() }
     }
 
     init(onCapture: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
@@ -79,7 +93,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         guard menu == self.menu else { return }
         permissionItem.title = Permissions.hasScreenCapture
             ? "Screen Recording: allowed"
-            : "Screen Recording: not allowed (relaunch after granting)"
+            : "Screen Recording: not allowed"
         copyAsFileItem.state = Settings.copyAsFile ? .on : .off
         rebuildRecentMenu()
     }

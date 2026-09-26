@@ -4,7 +4,8 @@ import SwiftUI
 /// First-launch window. Three things and then it never appears again: where the app lives,
 /// the one permission everything depends on, and the shortcut. It exists because a menu bar
 /// app with no window gives a new user nothing to look at, and because the Screen Recording
-/// grant only takes effect after a relaunch, which nobody can be expected to know.
+/// grant is invisible to `CGPreflightScreenCaptureAccess` until a relaunch: this window polls
+/// ScreenCaptureKit instead, so the grant is noticed the moment it lands.
 @MainActor final class WelcomeWindowController {
     private var window: NSWindow?
     private let model = WelcomeModel()
@@ -22,23 +23,14 @@ import SwiftUI
             window = w
         }
         model.refresh()
+        model.startWatching()
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
 
-    func close() { window?.orderOut(nil) }
-
-    /// `CGPreflightScreenCaptureAccess` answers for the life of the process, so a grant made
-    /// while the app is running is invisible until it starts again. Opening a menu bar app from
-    /// Spotlight or the Dock only activates the running instance, so do the relaunch properly:
-    /// ask Launch Services for a new instance, then quit this one once it has been asked.
-    static func relaunch() {
-        let config = NSWorkspace.OpenConfiguration()
-        config.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, error in
-            if let error { Log.app.error("relaunch failed: \(String(describing: error))") }
-            DispatchQueue.main.async { NSApp.terminate(nil) }
-        }
+    func close() {
+        model.stopWatching()
+        window?.orderOut(nil)
     }
 }
 
@@ -46,10 +38,33 @@ import SwiftUI
     @Published var granted = Permissions.hasScreenCapture
     @Published var hotkey = Settings.hotKeyDisplay
     @Published var launchAtLogin = Settings.launchAtLogin { didSet { Settings.launchAtLogin = launchAtLogin } }
+    private var poll: Task<Void, Never>?
 
     func refresh() {
         granted = Permissions.hasScreenCapture
         hotkey = Settings.hotKeyDisplay
+    }
+
+    /// While the window is up and the grant is missing, ask ScreenCaptureKit once a second
+    /// whether it has landed. The user toggles the switch in System Settings and comes back to
+    /// a window that already says Allowed, with no relaunch anywhere in the story.
+    func startWatching() {
+        guard poll == nil, !granted else { return }
+        poll = Task { [weak self] in
+            while !Task.isCancelled {
+                if await Permissions.probeScreenCapture() {
+                    self?.granted = true
+                    self?.poll = nil
+                    return
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    func stopWatching() {
+        poll?.cancel()
+        poll = nil
     }
 }
 
@@ -78,13 +93,12 @@ struct WelcomeView: View {
             WelcomeStep(number: 2, title: "Allow Screen Recording",
                         detail: model.granted
                             ? "macOS asks every screenshot app for this, once."
-                            : "macOS asks every screenshot app for this, once. Grant it in System Settings, come back here, and press Relaunch. The grant only takes effect after a relaunch.") {
+                            : "macOS asks every screenshot app for this, once. Grant it in System Settings and come back; this window notices on its own.") {
                 HStack(spacing: 10) {
                     if model.granted {
                         Label("Allowed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         Button("Open System Settings…") { Permissions.openScreenCaptureSettings() }
-                        Button("Relaunch Tyto") { WelcomeWindowController.relaunch() }
                             .keyboardShortcut(.defaultAction)
                     }
                 }
