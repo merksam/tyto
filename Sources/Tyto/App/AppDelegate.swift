@@ -20,8 +20,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // A finished capture is the real end of onboarding: the permission is granted and
             // the user has found the shortcut. Nothing left to explain.
             switch outcome {
-            case .copied, .saved: self?.markOnboarded()
-            case .cancelled: break
+            case .copied, .saved:
+                self?.markOnboarded()
+            case .cancelled:
+                // The overlay takes the welcome window off screen with it. If onboarding is
+                // not over, a cancelled first attempt should land back where the user was.
+                if let self, !UserDefaults.standard.bool(forKey: Self.hasLaunchedBeforeKey),
+                   self.welcomeWindowController != nil {
+                    self.openWelcome()
+                }
             }
         }
         statusMenu = StatusMenu(onCapture: { [weak self] in self?.requestCapture() },
