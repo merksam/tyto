@@ -86,7 +86,7 @@ struct WelcomeView: View {
             }
 
             WelcomeStep(number: 1, title: "It lives in the menu bar",
-                        detail: "Look for the viewfinder icon at the top right of the screen. There is no Dock icon and no main window.") {
+                        detail: "Look for the owl at the top right of the screen. There is no Dock icon and no main window.") {
                 EmptyView()
             }
 

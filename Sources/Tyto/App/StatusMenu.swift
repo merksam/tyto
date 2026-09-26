@@ -58,7 +58,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
-        item.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "Tyto")
+        let owl = OwlGlyph.image()
+        owl.accessibilityDescription = "Tyto"
+        item.button?.image = owl
         item.button?.toolTip = "Tyto — capture a region"
 
         let capture = NSMenuItem(title: "Capture Region", action: #selector(captureAction), keyEquivalent: "")
