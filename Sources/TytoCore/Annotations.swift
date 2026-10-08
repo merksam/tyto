@@ -91,11 +91,16 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
             return PixelRect(x: start.x - r, y: start.y - r, width: 2 * r, height: 2 * r)
         default:
             var r = PixelRect.spanning(start, end)
-            if let c = control {
-                // A quadratic curve stays inside the triangle of its three points, so spanning
-                // the control point too is a correct (if slightly generous) bound.
-                let minX = min(r.minX, c.x), minY = min(r.minY, c.y)
-                let maxX = max(r.maxX, c.x), maxY = max(r.maxY, c.y)
+            if control != nil {
+                // Tight bounds of the curve: its extremes are at the ends or where the
+                // derivative is zero on each axis. The control point itself lies twice as far
+                // out as the curve ever reaches, so spanning it would double the box.
+                var xs = [start.x, end.x], ys = [start.y, end.y]
+                for t in extremumParameters() {
+                    let p = point(at: t)
+                    xs.append(p.x); ys.append(p.y)
+                }
+                let minX = xs.min()!, maxX = xs.max()!, minY = ys.min()!, maxY = ys.max()!
                 r = PixelRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
             }
             return r
@@ -188,8 +193,11 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
             return s
         }
         // A quadratic Bézier passes through B(0.5) = (start + 2·control + end) / 4, so the
-        // control point that puts the midpoint at p is 2p − (start + end) / 2.
-        s.control = PixelPoint(x: 2 * p.x - (start.x + end.x) / 2, y: 2 * p.y - (start.y + end.y) / 2)
+        // control point that puts the midpoint at p is 2p − (start + end) / 2. In Double and
+        // rounded once: integer division would bias it by half a pixel whenever the ends sum
+        // to an odd number, and the handle would jitter under the pointer.
+        s.control = PixelPoint(x: Int((2 * Double(p.x) - Double(start.x + end.x) / 2).rounded()),
+                               y: Int((2 * Double(p.y) - Double(start.y + end.y) / 2).rounded()))
         return s
     }
 
@@ -204,6 +212,34 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
             prev = next
         }
         return best
+    }
+
+    /// Length of the shaft along the curve (the chord for a straight arrow), sampled the same
+    /// way. A tightly bent arrow is far longer than its chord, which matters for sizing the head.
+    public var curveLength: Double {
+        guard control != nil else { return hypot(Double(end.x - start.x), Double(end.y - start.y)) }
+        var total = 0.0
+        var prev = start
+        for i in 1...24 {
+            let next = point(at: Double(i) / 24)
+            total += hypot(Double(next.x - prev.x), Double(next.y - prev.y))
+            prev = next
+        }
+        return total
+    }
+
+    /// Parameters in (0, 1) where the curve turns around on the x or y axis: for a quadratic,
+    /// t = (s − c) / (s − 2c + e) per axis, when that lands strictly inside the span.
+    func extremumParameters() -> [Double] {
+        guard let c = control else { return [] }
+        var ts: [Double] = []
+        for (s, cc, e) in [(start.x, c.x, end.x), (start.y, c.y, end.y)] {
+            let denom = Double(s - 2 * cc + e)
+            guard denom != 0 else { continue }
+            let t = Double(s - cc) / denom
+            if t > 0, t < 1 { ts.append(t) }
+        }
+        return ts
     }
 }
 

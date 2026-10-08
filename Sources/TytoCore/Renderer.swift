@@ -127,7 +127,9 @@ public enum AnnotationRenderer {
             tx = dx; ty = dy
         }
         let angle = atan2(ty, tx)
-        let headLen = min(len, w * 3.5 + 6)
+        // Capped by the shaft's own length, not the chord's: a tightly bent arrow can be many
+        // times longer than the straight line between its ends and still deserves a full head.
+        let headLen = min(CGFloat(s.curveLength), w * 3.5 + 6)
         let half = CGFloat.pi / 7
         let p1 = CGPoint(x: b.x - headLen * cos(angle - half), y: b.y - headLen * sin(angle - half))
         let p2 = CGPoint(x: b.x - headLen * cos(angle + half), y: b.y - headLen * sin(angle + half))
