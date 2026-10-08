@@ -29,6 +29,8 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         case region
         case drawing(UUID)
         case movingShape(UUID, last: PixelPoint, recorded: Bool)
+        /// Dragging the middle handle of a selected arrow to curve it.
+        case bendingArrow(UUID, recorded: Bool)
     }
 
     struct Session {
@@ -395,6 +397,17 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         case .inside:
             switch tool {
             case .select:
+                // The bend handle of a selected arrow wins over whatever shape is under it.
+                if let sel = s.document.selectedShape, sel.kind == .arrow {
+                    let m = sel.curveMidpoint
+                    let reach = AnnotationRenderer.bendHandleRadius(scale: scale) + Double(slop)
+                    if hypot(Double(p.x - m.x), Double(p.y - m.y)) <= reach {
+                        s.dragMode = .bendingArrow(sel.id, recorded: false)
+                        session = s
+                        renderActive()
+                        return
+                    }
+                }
                 if let shape = s.document.topmostShape(at: p, tolerance: slop) {
                     s.document.selectedID = shape.id
                     s.dragMode = .movingShape(shape.id, last: p, recorded: false)
@@ -443,6 +456,13 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
             if !recorded { s.history.record(s.document) }
             s.document.update(shape.moved(dx: dx, dy: dy))
             s.dragMode = .movingShape(id, last: raw, recorded: true)
+        case .bendingArrow(let id, let recorded):
+            guard let shape = s.document.shape(id: id), let bounds = s.selection?.rect else { return }
+            if !recorded { s.history.record(s.document) }
+            let p = Self.clamp(raw, to: bounds)
+            let scale = s.snapshots[displayID]?.geometry.scale ?? 1
+            s.document.update(shape.bent(through: p, straightenWithin: Int((3 * scale).rounded())))
+            s.dragMode = .bendingArrow(id, recorded: true)
         }
         session = s
         renderActive()
@@ -462,7 +482,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
                 s.document.remove(id: id)
                 s.history.discardLastRecord()
             }
-        case .movingShape:
+        case .movingShape, .bendingArrow:
             break
         }
         s.dragMode = .none

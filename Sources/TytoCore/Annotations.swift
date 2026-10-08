@@ -68,11 +68,15 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
     /// Measured size of `text` at `style.fontSize`; kept on the shape so the model needs no font access.
     public var textSize: PixelSize
     public var number: Int
+    /// Arrows only: the quadratic Bézier control point that bends the shaft. nil is a straight
+    /// arrow, and what every document written before 1.2 decodes to.
+    public var control: PixelPoint?
 
     public init(id: UUID = UUID(), kind: ShapeKind, start: PixelPoint, end: PixelPoint, style: ShapeStyle,
-                text: String = "", textSize: PixelSize = PixelSize(width: 0, height: 0), number: Int = 0) {
+                text: String = "", textSize: PixelSize = PixelSize(width: 0, height: 0), number: Int = 0,
+                control: PixelPoint? = nil) {
         self.id = id; self.kind = kind; self.start = start; self.end = end; self.style = style
-        self.text = text; self.textSize = textSize; self.number = number
+        self.text = text; self.textSize = textSize; self.number = number; self.control = control
     }
 
     public var badgeRadius: Int { max(8, Int((style.fontSize * 0.72).rounded())) }
@@ -86,7 +90,15 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
             let r = badgeRadius
             return PixelRect(x: start.x - r, y: start.y - r, width: 2 * r, height: 2 * r)
         default:
-            return PixelRect.spanning(start, end)
+            var r = PixelRect.spanning(start, end)
+            if let c = control {
+                // A quadratic curve stays inside the triangle of its three points, so spanning
+                // the control point too is a correct (if slightly generous) bound.
+                let minX = min(r.minX, c.x), minY = min(r.minY, c.y)
+                let maxX = max(r.maxX, c.x), maxY = max(r.maxY, c.y)
+                r = PixelRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+            }
+            return r
         }
     }
 
@@ -111,6 +123,7 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
         var s = self
         s.start = PixelPoint(x: start.x + dx, y: start.y + dy)
         s.end = PixelPoint(x: end.x + dx, y: end.y + dy)
+        if let c = control { s.control = PixelPoint(x: c.x + dx, y: c.y + dy) }
         return s
     }
 
@@ -118,6 +131,7 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
         let tol = Double(tolerance) + style.strokeWidth / 2
         switch kind {
         case .line, .arrow:
+            if control != nil { return distanceToCurve(from: p) <= tol }
             return Self.distance(from: p, toSegment: start, end) <= tol
         case .rect:
             let b = bounds
@@ -146,6 +160,50 @@ public struct Shape: Identifiable, Hashable, Sendable, Codable {
         t = min(max(t, 0), 1)
         let cx = ax + t * dx, cy = ay + t * dy
         return ((px - cx) * (px - cx) + (py - cy) * (py - cy)).squareRoot()
+    }
+
+    // MARK: Curved arrows
+
+    /// Point on the shaft at parameter `t` (0 = tail, 1 = head). Straight when `control` is nil.
+    public func point(at t: Double) -> PixelPoint {
+        let sx = Double(start.x), sy = Double(start.y), ex = Double(end.x), ey = Double(end.y)
+        guard let c = control else {
+            return PixelPoint(x: Int((sx + (ex - sx) * t).rounded()), y: Int((sy + (ey - sy) * t).rounded()))
+        }
+        let cx = Double(c.x), cy = Double(c.y), u = 1 - t
+        return PixelPoint(x: Int((u * u * sx + 2 * u * t * cx + t * t * ex).rounded()),
+                          y: Int((u * u * sy + 2 * u * t * cy + t * t * ey).rounded()))
+    }
+
+    /// Where the bend handle sits: the middle of the shaft, curved or not.
+    public var curveMidpoint: PixelPoint { point(at: 0.5) }
+
+    /// The shape with its shaft passing through `p` at the middle. Within `straightenWithin`
+    /// pixels of the straight line between the ends it snaps straight instead, so dragging the
+    /// handle back is how you undo a bend without reaching for ⌘Z.
+    public func bent(through p: PixelPoint, straightenWithin: Int) -> Shape {
+        var s = self
+        if Self.distance(from: p, toSegment: start, end) <= Double(straightenWithin) {
+            s.control = nil
+            return s
+        }
+        // A quadratic Bézier passes through B(0.5) = (start + 2·control + end) / 4, so the
+        // control point that puts the midpoint at p is 2p − (start + end) / 2.
+        s.control = PixelPoint(x: 2 * p.x - (start.x + end.x) / 2, y: 2 * p.y - (start.y + end.y) / 2)
+        return s
+    }
+
+    /// Distance from `p` to the curved shaft, by sampling it as 24 straight pieces, which is
+    /// within a pixel for any curve a hand can draw at screen sizes.
+    func distanceToCurve(from p: PixelPoint) -> Double {
+        var best = Double.infinity
+        var prev = start
+        for i in 1...24 {
+            let next = point(at: Double(i) / 24)
+            best = min(best, Self.distance(from: p, toSegment: prev, next))
+            prev = next
+        }
+        return best
     }
 }
 

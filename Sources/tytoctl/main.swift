@@ -79,7 +79,7 @@ case "draw":
     guard positional.count == 4, let x = Int(positional[0]), let y = Int(positional[1]),
           let x2 = Int(positional[2]), let y2 = Int(positional[3]) else { die("draw needs X1 Y1 X2 Y2") }
     request.x = x; request.y = y; request.x2 = x2; request.y2 = y2
-case "click", "hover":
+case "click", "hover", "bend":
     guard positional.count == 2, let x = Int(positional[0]), let y = Int(positional[1]) else { die("\(cmd) needs X Y") }
     request.x = x; request.y = y
 case "text":
