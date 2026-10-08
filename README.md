@@ -21,6 +21,7 @@ macOS asks for Screen Recording permission the first time. Grant it and relaunch
 
 - Drag a region, or click a window to take just that window
 - Seven drawing tools: box, ellipse, line, arrow, text, pixelate, numbered badges
+- Arrows bend: select one and drag the handle in its middle
 - Return copies to the clipboard, ⌘S writes a PNG
 - Every capture is also saved to `~/Pictures/Tyto`, last 24 in the menu bar, and it can be
   turned off

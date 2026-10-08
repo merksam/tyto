@@ -251,6 +251,19 @@ enum DebugCommands {
             app.openWelcome()
             return .success()
 
+        case "bend":
+            // Drags the selected arrow's middle handle to (x, y) through the real press/drag/
+            // release path, so it exercises the handle hit test and the bend math together.
+            guard let x = req.x, let y = req.y else { throw TytoError.badRequest("bend needs x y") }
+            let id = try activeDisplay(overlay, req.display, capturer: capturer)
+            guard let shape = overlay.session?.document.selectedShape, shape.kind == .arrow else {
+                throw TytoError.badRequest("bend needs a selected arrow: tool select, then click on it")
+            }
+            overlay.press(at: shape.curveMidpoint, on: id)
+            overlay.drag(to: PixelPoint(x: x, y: y), on: id)
+            overlay.release(on: id)
+            return .success(stateJSON(overlay))
+
         case "hint":
             app.showHint(req.value ?? "Tyto lives here.")
             return .success()

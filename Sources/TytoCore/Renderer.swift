@@ -117,7 +117,16 @@ public enum AnnotationRenderer {
         let len = (dx * dx + dy * dy).squareRoot()
         guard len > 0.5 else { return }
         let w = CGFloat(s.style.strokeWidth)
-        let angle = atan2(dy, dx)
+        // The head points along the shaft's direction at the tip: the chord for a straight
+        // arrow, the tangent (control → end) for a curved one.
+        let control = s.control?.cgPoint
+        let tx: CGFloat, ty: CGFloat
+        if let c = control, hypot(b.x - c.x, b.y - c.y) > 0.5 {
+            tx = b.x - c.x; ty = b.y - c.y
+        } else {
+            tx = dx; ty = dy
+        }
+        let angle = atan2(ty, tx)
         let headLen = min(len, w * 3.5 + 6)
         let half = CGFloat.pi / 7
         let p1 = CGPoint(x: b.x - headLen * cos(angle - half), y: b.y - headLen * sin(angle - half))
@@ -125,7 +134,24 @@ public enum AnnotationRenderer {
         // The shaft stops inside the head so its round cap never pokes past the tip.
         let shaftEnd = CGPoint(x: b.x - headLen * 0.75 * cos(angle), y: b.y - headLen * 0.75 * sin(angle))
         ctx.move(to: a)
-        ctx.addLine(to: shaftEnd)
+        if let c = control {
+            // Trim along the curve itself, not by moving its endpoint: a quadratic with the
+            // same control point and a different end is a different curve, and the shaft would
+            // drift off the one the handle promised. Walk back from the tip until the head's
+            // length is cleared, then de Casteljau-split there.
+            func bez(_ t: CGFloat) -> CGPoint {
+                let u = 1 - t
+                return CGPoint(x: u * u * a.x + 2 * u * t * c.x + t * t * b.x,
+                               y: u * u * a.y + 2 * u * t * c.y + t * t * b.y)
+            }
+            let cut = headLen * 0.75
+            var t: CGFloat = 1
+            while t > 0.05, hypot(bez(t).x - b.x, bez(t).y - b.y) < cut { t -= 0.01 }
+            let c2 = CGPoint(x: (1 - t) * a.x + t * c.x, y: (1 - t) * a.y + t * c.y)
+            ctx.addQuadCurve(to: bez(t), control: c2)
+        } else {
+            ctx.addLine(to: shaftEnd)
+        }
         ctx.strokePath()
         ctx.move(to: b)
         ctx.addLine(to: p1)
@@ -230,6 +256,23 @@ public enum AnnotationRenderer {
         ctx.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.95))
         ctx.setLineDash(phase: 0, lengths: [CGFloat(4 * scale), CGFloat(4 * scale)])
         ctx.stroke(r)
+        ctx.restoreGState()
+        if s.kind == .arrow { drawBendHandle(for: s, into: ctx, scale: scale) }
+    }
+
+    /// The round handle in the middle of a selected arrow. Drag it to bend the shaft.
+    public static func bendHandleRadius(scale: Double) -> Double { 5 * scale }
+
+    static func drawBendHandle(for s: Shape, into ctx: CGContext, scale: Double) {
+        let m = s.curveMidpoint.cgPoint
+        let r = CGFloat(bendHandleRadius(scale: scale))
+        let circle = CGRect(x: m.x - r, y: m.y - r, width: 2 * r, height: 2 * r)
+        ctx.saveGState()
+        ctx.setFillColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.95))
+        ctx.fillEllipse(in: circle)
+        ctx.setLineWidth(CGFloat(scale))
+        ctx.setStrokeColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.6))
+        ctx.strokeEllipse(in: circle)
         ctx.restoreGState()
     }
 
