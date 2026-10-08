@@ -45,24 +45,8 @@ enum Tool: String, CaseIterable, Sendable {
         }
     }
 
-    /// The physical key for `key`. Matching on this rather than on the typed character means
-    /// the shortcut follows the keycap, so it works under Cyrillic and other non-Latin layouts,
-    /// where the A key types "ф" and a character comparison never fires.
-    var keyCode: UInt16 {
-        switch self {
-        case .select: UInt16(kVK_ANSI_V)
-        case .rect: UInt16(kVK_ANSI_R)
-        case .ellipse: UInt16(kVK_ANSI_E)
-        case .line: UInt16(kVK_ANSI_L)
-        case .arrow: UInt16(kVK_ANSI_A)
-        case .text: UInt16(kVK_ANSI_T)
-        case .blur: UInt16(kVK_ANSI_B)
-        case .badge: UInt16(kVK_ANSI_N)
-        }
-    }
-
-    init?(keyCode: UInt16) {
-        guard let t = Tool.allCases.first(where: { $0.keyCode == keyCode }) else { return nil }
+    init?(key: Character) {
+        guard let t = Tool.allCases.first(where: { $0.key == String(key) }) else { return nil }
         self = t
     }
 
@@ -77,6 +61,37 @@ enum Tool: String, CaseIterable, Sendable {
         case .blur: .blur
         case .badge: .badge
         }
+    }
+}
+
+/// The QWERTY letter on each physical letter key, for layouts whose keycaps are not Latin.
+enum LatinKeyCodes {
+    private static let table: [UInt16: Character] = [
+        UInt16(kVK_ANSI_A): "a", UInt16(kVK_ANSI_B): "b", UInt16(kVK_ANSI_C): "c", UInt16(kVK_ANSI_D): "d",
+        UInt16(kVK_ANSI_E): "e", UInt16(kVK_ANSI_F): "f", UInt16(kVK_ANSI_G): "g", UInt16(kVK_ANSI_H): "h",
+        UInt16(kVK_ANSI_I): "i", UInt16(kVK_ANSI_J): "j", UInt16(kVK_ANSI_K): "k", UInt16(kVK_ANSI_L): "l",
+        UInt16(kVK_ANSI_M): "m", UInt16(kVK_ANSI_N): "n", UInt16(kVK_ANSI_O): "o", UInt16(kVK_ANSI_P): "p",
+        UInt16(kVK_ANSI_Q): "q", UInt16(kVK_ANSI_R): "r", UInt16(kVK_ANSI_S): "s", UInt16(kVK_ANSI_T): "t",
+        UInt16(kVK_ANSI_U): "u", UInt16(kVK_ANSI_V): "v", UInt16(kVK_ANSI_W): "w", UInt16(kVK_ANSI_X): "x",
+        UInt16(kVK_ANSI_Y): "y", UInt16(kVK_ANSI_Z): "z",
+    ]
+    static func letter(for code: UInt16) -> Character? { table[code] }
+}
+
+extension NSEvent {
+    /// The Latin letter this key press stands for, on any keyboard layout.
+    ///
+    /// The typed character wins when it is a Latin letter, so the shortcut follows the keycap on
+    /// QWERTY, AZERTY, Dvorak and the rest. Only when the layout types something else — the A
+    /// key under Cyrillic gives "ф" — does the physical key's QWERTY letter stand in. Matching
+    /// on the key code alone was wrong the other way round: it broke every Latin layout whose
+    /// letters sit in different places.
+    var latinKey: Character? {
+        if let s = charactersIgnoringModifiers?.lowercased(), s.count == 1, let c = s.first,
+           c.isASCII, c.isLetter {
+            return c
+        }
+        return LatinKeyCodes.letter(for: keyCode)
     }
 }
 

@@ -628,10 +628,10 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         case 51, 117: // Delete, forward delete
             deleteSelectedShape()
         default:
-            // Match the physical key, not the typed character, so the shortcut follows the
-            // keycap under any keyboard layout. See Tool.keyCode.
+            // The typed letter on Latin layouts, the physical key's letter otherwise. See
+            // NSEvent.latinKey for why neither alone is right.
             let mods = event.modifierFlags.intersection([.command, .control, .option])
-            guard mods.isEmpty, let t = Tool(keyCode: event.keyCode) else { return }
+            guard mods.isEmpty, let k = event.latinKey, let t = Tool(key: k) else { return }
             setTool(t)
         }
     }
@@ -639,18 +639,18 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     func selectionView(_ view: SelectionView, keyEquivalent event: NSEvent) -> Bool {
         guard !view.isEditingText else { return false }
         let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        // Physical keys (kVK_ANSI_C/S/Z), so ⌘C, ⌘S and ⌘Z work under any keyboard layout.
-        switch (mods, event.keyCode) {
-        case (.command, 8): // C
+        // NSEvent.latinKey: the keycap's letter on Latin layouts, the physical key's on others.
+        switch (mods, event.latinKey) {
+        case (.command, "c"):
             do { try copy() } catch { Log.overlay.error("copy failed: \(String(describing: error))") }
             return true
-        case (.command, 1): // S
+        case (.command, "s"):
             save()
             return true
-        case (.command, 6): // Z
+        case (.command, "z"):
             undo()
             return true
-        case ([.command, .shift], 6): // ⇧Z
+        case ([.command, .shift], "z"):
             redo()
             return true
         default:

@@ -16,6 +16,12 @@ private func arrow(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) -> Shape {
         #expect(s.curveMidpoint == PixelPoint(x: 50, y: 30))
         // Ends never move.
         #expect(s.start == PixelPoint(x: 0, y: 0) && s.end == PixelPoint(x: 100, y: 0))
+
+        // Odd sums must not bias the handle: integer division would put it a pixel off.
+        let odd = arrow(1, 0, 100, 0).bent(through: PixelPoint(x: 50, y: 30), straightenWithin: 3)
+        #expect(odd.curveMidpoint == PixelPoint(x: 50, y: 30))
+        let oddY = arrow(0, 3, 100, 0).bent(through: PixelPoint(x: 50, y: 31), straightenWithin: 3)
+        #expect(oddY.curveMidpoint == PixelPoint(x: 50, y: 31))
     }
 
     @Test func draggingBackNearTheChordStraightens() {
@@ -35,7 +41,9 @@ private func arrow(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) -> Shape {
 
     @Test func boundsAndMoveIncludeTheControlPoint() {
         let s = arrow(0, 0, 100, 0).bent(through: PixelPoint(x: 50, y: 30), straightenWithin: 3)
-        #expect(s.bounds.maxY >= 60, "bounds cover the control point so selection chrome encloses the curve")
+        // The curve peaks at y = 30; the control point sits at 60 and must not inflate the box.
+        #expect(s.bounds.maxY == 30, "bounds hug the curve's apex, not the control point")
+        #expect(s.bounds.minY == 0 && s.bounds.minX == 0 && s.bounds.maxX == 100)
         let moved = s.moved(dx: 10, dy: 5)
         #expect(moved.control == PixelPoint(x: 60, y: 65))
         #expect(moved.curveMidpoint == PixelPoint(x: 60, y: 35))

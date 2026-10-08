@@ -20,6 +20,11 @@ import SwiftUI
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.center()
+            // The red close button never reaches close(), so stop the poll from here too.
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w,
+                                                   queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.model.stopWatching() }
+            }
             window = w
         }
         model.refresh()

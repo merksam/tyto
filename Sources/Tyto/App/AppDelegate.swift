@@ -23,10 +23,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .copied, .saved:
                 self?.markOnboarded()
             case .cancelled:
-                // The overlay takes the welcome window off screen with it. If onboarding is
-                // not over, a cancelled first attempt should land back where the user was.
-                if let self, !UserDefaults.standard.bool(forKey: Self.hasLaunchedBeforeKey),
-                   self.welcomeWindowController != nil {
+                // The overlay takes the welcome window off screen with it. If it was up when
+                // the capture began, a cancelled attempt should land back where the user was;
+                // if they had already dismissed it, it stays dismissed.
+                if let self, self.welcomeWasVisibleAtCapture,
+                   !UserDefaults.standard.bool(forKey: Self.hasLaunchedBeforeKey) {
                     self.openWelcome()
                 }
             }
@@ -120,12 +121,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Hotkey / menu entry point: the interactive, all-displays session.
     /// Pressing the hotkey while a session is up cancels it: Carbon hotkeys work regardless of
     /// focus, so this is the escape hatch if the overlay ever fails to become key.
+    /// Whether the welcome window was up when the current capture began, so a cancelled first
+    /// attempt can bring it back - and only then. After Later it stays dismissed.
+    private var welcomeWasVisibleAtCapture = false
+
     func requestCapture() {
         statusMenu?.closeHint()
         if overlay.isActive {
             overlay.cancel()
             return
         }
+        welcomeWasVisibleAtCapture = isWelcomeWindowVisible
         Task {
             do {
                 try await overlay.beginSession(options: .interactive)
