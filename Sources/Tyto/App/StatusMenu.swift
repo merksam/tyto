@@ -59,12 +59,14 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         guard menu == self.menu else { return }
         isOpen = true
         closeHint()
+        Log.app.info("status menu opened (Capture Region key equivalent: \(self.captureItem.keyEquivalent, privacy: .public))")
     }
 
     func menuDidClose(_ menu: NSMenu) {
         guard menu == self.menu else { return }
         isOpen = false
         closedAt = ProcessInfo.processInfo.systemUptime
+        Log.app.info("status menu closed")
     }
 
     /// Takes the menu down at once, for a hotkey that arrives while it is open: a capture
