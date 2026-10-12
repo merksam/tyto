@@ -8,8 +8,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let recentItem = NSMenuItem(title: "Recent Captures", action: nil, keyEquivalent: "")
     private let recentMenu = NSMenu()
     private let onCapture: () -> Void
+    private let onCaptureOverMenu: () -> Void
     private let onOpenSettings: () -> Void
     private var hintPopover: NSPopover?
+
+    /// Told when the menu opens (true) and closes (false).
+    var onOpenChange: ((Bool) -> Void)?
 
     /// A short note anchored to the status item itself, so the arrow points at the real owl
     /// wherever the menu bar has put it. Goes away on its own or on a click elsewhere.
@@ -48,12 +52,86 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         hintPopover = nil
     }
 
+    // MARK: Open state
+
+    /// True while the status menu is tracking, i.e. open on screen.
+    private(set) var isOpen = false
+    private var closedAt: TimeInterval?
+
     func menuWillOpen(_ menu: NSMenu) {
-        if menu == self.menu { closeHint() }
+        guard menu == self.menu, !isOpen else { return }
+        isOpen = true
+        closeHint()
+        onOpenChange?(true)
+        startWatchingChord()
+        Log.app.info("status menu opened")
     }
 
-    init(onCapture: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu == self.menu else { return }
+        noteClosed()
+    }
+
+    /// Takes the menu down at once, without the fade.
+    func dismiss() {
+        menu.cancelTrackingWithoutAnimation()
+        noteClosed()
+    }
+
+    private func noteClosed() {
+        guard isOpen else { return }
+        isOpen = false
+        closedAt = ProcessInfo.processInfo.systemUptime
+        stopWatchingChord()
+        onOpenChange?(false)
+        Log.app.info("status menu closed")
+    }
+
+    /// Seconds a capture should still wait for the menu's windows to leave the screen. Choosing
+    /// an item fires its action while the menu is fading out, and a frame captured in that
+    /// moment has the half-faded menu in it.
+    var settleDelay: TimeInterval {
+        guard let closedAt else { return 0 }
+        return max(0, 0.25 - (ProcessInfo.processInfo.systemUptime - closedAt))
+    }
+
+    // MARK: The hotkey while the menu is open
+
+    /// An open menu takes every key press for itself, and the window server would turn the
+    /// hotkey chord into a hotkey event the menu never sees, queued until the menu closes. So
+    /// while the menu is up the hotkey is not registered (see onOpenChange) and the keys are
+    /// read directly instead, on a timer in the common run loop modes, which the tracking
+    /// menu's run loop mode is one of. The capture then has the menu in the frame.
+    private var chordTimer: Timer?
+    private var chordWasDown = false
+
+    private func startWatchingChord() {
+        chordWasDown = chordIsDown()
+        let timer = Timer(timeInterval: 0.025, target: self, selector: #selector(pollChord), userInfo: nil, repeats: true)
+        RunLoop.main.add(timer, forMode: .common)
+        chordTimer = timer
+    }
+
+    private func stopWatchingChord() {
+        chordTimer?.invalidate()
+        chordTimer = nil
+    }
+
+    @objc private func pollChord() {
+        let down = chordIsDown()
+        defer { chordWasDown = down }
+        if down, !chordWasDown { onCaptureOverMenu() }
+    }
+
+    private func chordIsDown() -> Bool {
+        HotkeyFormat.carbonModifiers(from: NSEvent.modifierFlags) == Settings.hotKeyModifiers
+            && CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(Settings.hotKeyCode))
+    }
+
+    init(onCapture: @escaping () -> Void, onCaptureOverMenu: @escaping () -> Void,
+         onOpenSettings: @escaping () -> Void) {
         self.onCapture = onCapture
+        self.onCaptureOverMenu = onCaptureOverMenu
         self.onOpenSettings = onOpenSettings
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
@@ -134,13 +212,18 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
 
+    /// Fits the capture inside a 72×24 box, keeping its aspect. Scaling to a fixed height alone
+    /// let a wide strip, a whole toolbar say, turn into a thumbnail several times wider than
+    /// the menu, which then stretched to match.
     private func thumbnail(for url: URL) -> NSImage? {
-        guard let img = NSImage(contentsOf: url) else { return nil }
-        let h: CGFloat = 24
-        let ratio = img.size.width / max(img.size.height, 1)
-        let thumb = NSImage(size: CGSize(width: h * ratio, height: h))
+        guard let img = NSImage(contentsOf: url), img.size.width > 0, img.size.height > 0 else { return nil }
+        let box = CGSize(width: 72, height: 24)
+        let scale = min(box.width / img.size.width, box.height / img.size.height)
+        let size = CGSize(width: max(1, (img.size.width * scale).rounded()),
+                          height: max(1, (img.size.height * scale).rounded()))
+        let thumb = NSImage(size: size)
         thumb.lockFocus()
-        img.draw(in: CGRect(origin: .zero, size: thumb.size))
+        img.draw(in: CGRect(origin: .zero, size: size))
         thumb.unlockFocus()
         return thumb
     }

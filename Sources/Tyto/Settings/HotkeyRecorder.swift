@@ -29,9 +29,32 @@ enum HotkeyFormat {
             kVK_Escape: "⎋", kVK_ForwardDelete: "⌦", kVK_Home: "↖", kVK_End: "↘",
             kVK_PageUp: "⇞", kVK_PageDown: "⇟", kVK_LeftArrow: "←", kVK_RightArrow: "→",
             kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+            kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6",
+            kVK_F7: "F7", kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12",
         ]
         if let n = named[Int(code)] { return n }
         return fallback.uppercased()
+    }
+
+    /// What the key types on the current layout with nothing else held: "9" for the 9 key,
+    /// where the event under ⇧ would say "(". Nil when the layout has nothing for the key.
+    static func plainCharacter(for code: UInt32) -> String? {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let raw = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+        let layoutData = Unmanaged<CFData>.fromOpaque(raw).takeUnretainedValue() as Data
+        var deadKeys: UInt32 = 0
+        var chars = [UniChar](repeating: 0, count: 4)
+        var length = 0
+        let status = layoutData.withUnsafeBytes { buf -> OSStatus in
+            guard let base = buf.baseAddress else { return OSStatus(paramErr) }
+            return UCKeyTranslate(base.assumingMemoryBound(to: UCKeyboardLayout.self), UInt16(code),
+                                  UInt16(kUCKeyActionDisplay), 0, UInt32(LMGetKbdType()),
+                                  OptionBits(kUCKeyTranslateNoDeadKeysMask), &deadKeys, chars.count, &length, &chars)
+        }
+        guard status == noErr, length == 1, let scalar = Unicode.Scalar(chars[0]),
+              !CharacterSet.controlCharacters.contains(scalar), !CharacterSet.whitespaces.contains(scalar)
+        else { return nil }
+        return String(Character(scalar))
     }
 }
 
@@ -93,8 +116,9 @@ final class HotkeyRecorderView: NSView {
         let mods = HotkeyFormat.carbonModifiers(from: event.modifierFlags)
         guard mods != 0 else { NSSound.beep(); return }  // require a modifier
         let code = UInt32(event.keyCode)
-        let display = HotkeyFormat.modifierSymbols(mods)
-            + HotkeyFormat.keyName(code: code, fallback: event.charactersIgnoringModifiers ?? "?")
+        // The plain key, so ⇧⌘9 reads "⇧⌘9" and not "⇧⌘(".
+        let plain = HotkeyFormat.plainCharacter(for: code) ?? event.charactersIgnoringModifiers ?? "?"
+        let display = HotkeyFormat.modifierSymbols(mods) + HotkeyFormat.keyName(code: code, fallback: plain)
         recording = false
         stopMonitor()
         onRecorded?(code, mods, display)

@@ -33,7 +33,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         statusMenu = StatusMenu(onCapture: { [weak self] in self?.requestCapture() },
+                                onCaptureOverMenu: { [weak self] in self?.captureOverMenu() },
                                 onOpenSettings: { [weak self] in self?.openSettings() })
+        // While the menu is up the chord has to reach the menu's own watcher as a key press.
+        // Left registered, the window server turns it into a hotkey event that the tracking
+        // menu never sees and that fires only once the menu has closed.
+        statusMenu?.onOpenChange = { [weak self] open in
+            if open { self?.hotkey?.unregister() } else { self?.registerHotkey() }
+        }
         registerHotkey()
         NotificationCenter.default.addObserver(self, selector: #selector(hotkeyChanged),
                                                name: Settings.hotkeyChanged, object: nil)
@@ -125,19 +132,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// attempt can bring it back - and only then. After Later it stays dismissed.
     private var welcomeWasVisibleAtCapture = false
 
+    /// A start is waiting for the status menu to leave the screen; a request in that window is
+    /// a repeat of the same one.
+    private var captureStartPending = false
+
     func requestCapture() {
         statusMenu?.closeHint()
         if overlay.isActive {
             overlay.cancel()
             return
         }
+        guard !captureStartPending else { return }
+        // Capture Region, chosen from the menu, fires while the menu is still fading out; a
+        // frame taken that instant has the half-faded menu in it.
+        let settle = statusMenu?.settleDelay ?? 0
+        Log.app.info("capture requested (settle \(Int(settle * 1000)) ms)")
+        guard settle > 0 else { startCapture(); return }
+        captureStartPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + settle) { [weak self] in
+            guard let self else { return }
+            self.captureStartPending = false
+            self.startCapture()
+        }
+    }
+
+    /// The hotkey chord while the status menu is open. The menu stays up for the frame, so the
+    /// capture can be of the menu itself, and comes down the moment the frame is taken so the
+    /// overlay gets the input instead.
+    func captureOverMenu() {
+        guard !overlay.isActive, !captureStartPending else { return }
+        Log.app.info("capture requested over the open menu")
+        startCapture(afterCapture: { [weak self] in self?.statusMenu?.dismiss() })
+    }
+
+    /// `afterCapture` runs once the frame is in hand, before any overlay UI; on a failure it
+    /// runs before the failure is handled, so a permission prompt never lands under the menu.
+    private func startCapture(afterCapture: (() -> Void)? = nil) {
         welcomeWasVisibleAtCapture = isWelcomeWindowVisible
         Task {
             do {
-                try await overlay.beginSession(options: .interactive)
+                try await overlay.beginSession(options: .interactive, afterCapture: afterCapture)
             } catch TytoError.noScreenCapturePermission {
+                afterCapture?()
                 Permissions.requestScreenCapture()
             } catch {
+                afterCapture?()
                 Log.app.error("capture failed: \(String(describing: error))")
             }
         }

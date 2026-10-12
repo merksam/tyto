@@ -70,7 +70,10 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
 
     // MARK: Session lifecycle
 
-    func beginSession(options: SessionOptions) async throws {
+    /// `afterCapture` runs once the frame is in hand and before any overlay UI goes up: the
+    /// place for something that belongs in the frame but not on top of the overlay, the open
+    /// status menu say.
+    func beginSession(options: SessionOptions, afterCapture: (() -> Void)? = nil) async throws {
         guard session == nil else { throw TytoError.sessionAlreadyActive }
         // Every capture starts from the configured defaults (colour, tool, width).
         tool = Settings.defaultTool
@@ -89,6 +92,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         let snapshots = try await capturer.capture(displays: wanted)
         timings.captureMS = (ContinuousClock.now - start).milliseconds
         timings.displays = snapshots.count
+        afterCapture?()
 
         var s = Session(options: options)
         s.order = wanted.map(\.id)
