@@ -125,12 +125,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// attempt can bring it back - and only then. After Later it stays dismissed.
     private var welcomeWasVisibleAtCapture = false
 
+    /// A start is waiting for the status menu to leave the screen. A request in that window is
+    /// the same press arriving twice, as the menu's key equivalent and as the hotkey.
+    private var captureStartPending = false
+
     func requestCapture() {
         statusMenu?.closeHint()
         if overlay.isActive {
             overlay.cancel()
             return
         }
+        guard !captureStartPending else { return }
+        let menuWasOpen = statusMenu?.isOpen ?? false
+        if menuWasOpen {
+            // The hotkey while the status menu is open. Started now, the capture would freeze
+            // the menu into the frame and the overlay would lose key focus to it.
+            statusMenu?.dismiss()
+        }
+        // Also covers Capture Region itself, chosen by click or by its key equivalent: the
+        // action fires while the menu is still fading out.
+        let settle = statusMenu?.settleDelay ?? 0
+        Log.app.info("capture requested (menu open: \(menuWasOpen), settle \(Int(settle * 1000)) ms)")
+        guard settle > 0 else { startCapture(); return }
+        captureStartPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + settle) { [weak self] in
+            guard let self else { return }
+            self.captureStartPending = false
+            self.startCapture()
+        }
+    }
+
+    private func startCapture() {
         welcomeWasVisibleAtCapture = isWelcomeWindowVisible
         Task {
             do {

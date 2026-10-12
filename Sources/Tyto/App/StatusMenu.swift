@@ -3,6 +3,7 @@ import AppKit
 final class StatusMenu: NSObject, NSMenuDelegate {
     private let item: NSStatusItem
     private let menu = NSMenu()
+    private let captureItem = NSMenuItem(title: "Capture Region", action: #selector(captureAction), keyEquivalent: "")
     private let permissionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let copyAsFileItem = NSMenuItem(title: "Also Copy as File", action: #selector(toggleCopyAsFile), keyEquivalent: "")
     private let recentItem = NSMenuItem(title: "Recent Captures", action: nil, keyEquivalent: "")
@@ -48,8 +49,47 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         hintPopover = nil
     }
 
+    // MARK: Open state
+
+    /// True while the status menu is tracking, i.e. open on screen.
+    private(set) var isOpen = false
+    private var closedAt: TimeInterval?
+
     func menuWillOpen(_ menu: NSMenu) {
-        if menu == self.menu { closeHint() }
+        guard menu == self.menu else { return }
+        isOpen = true
+        closeHint()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu == self.menu else { return }
+        isOpen = false
+        closedAt = ProcessInfo.processInfo.systemUptime
+    }
+
+    /// Takes the menu down at once, for a hotkey that arrives while it is open: a capture
+    /// started under the menu would freeze it into the frame and the overlay would lose key
+    /// focus to it.
+    func dismiss() {
+        menu.cancelTrackingWithoutAnimation()
+        isOpen = false
+        closedAt = ProcessInfo.processInfo.systemUptime
+    }
+
+    /// Seconds a capture should still wait for the menu's windows to leave the screen. Choosing
+    /// an item, by click or by its key equivalent, fires the action while the menu is fading out,
+    /// and a frame captured in that moment has the half-faded menu in it.
+    var settleDelay: TimeInterval {
+        guard let closedAt else { return 0 }
+        return max(0, 0.25 - (ProcessInfo.processInfo.systemUptime - closedAt))
+    }
+
+    /// Mirrors the global hotkey on Capture Region. An open menu takes every key press for
+    /// itself, so the hotkey alone cannot reach the app while the menu is up; as the item's key
+    /// equivalent the same chord works there too, and the menu shows it next to the item.
+    private func syncHotkey() {
+        captureItem.keyEquivalent = HotkeyFormat.keyEquivalent(for: Settings.hotKeyCode) ?? ""
+        captureItem.keyEquivalentModifierMask = HotkeyFormat.modifierFlags(from: Settings.hotKeyModifiers)
     }
 
     init(onCapture: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
@@ -63,9 +103,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         item.button?.image = owl
         item.button?.toolTip = "Tyto — capture a region"
 
-        let capture = NSMenuItem(title: "Capture Region", action: #selector(captureAction), keyEquivalent: "")
-        capture.target = self
-        menu.addItem(capture)
+        captureItem.target = self
+        menu.addItem(captureItem)
+        syncHotkey()
         menu.addItem(.separator())
 
         recentItem.submenu = recentMenu
@@ -93,6 +133,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu == self.menu else { return }
+        syncHotkey()
         permissionItem.title = Permissions.hasScreenCapture
             ? "Screen Recording: allowed"
             : "Screen Recording: not allowed"
@@ -134,13 +175,18 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
 
+    /// Fits the capture inside a 72×24 box, keeping its aspect. Scaling to a fixed height alone
+    /// let a wide strip, a whole toolbar say, turn into a thumbnail several times wider than
+    /// the menu, which then stretched to match.
     private func thumbnail(for url: URL) -> NSImage? {
-        guard let img = NSImage(contentsOf: url) else { return nil }
-        let h: CGFloat = 24
-        let ratio = img.size.width / max(img.size.height, 1)
-        let thumb = NSImage(size: CGSize(width: h * ratio, height: h))
+        guard let img = NSImage(contentsOf: url), img.size.width > 0, img.size.height > 0 else { return nil }
+        let box = CGSize(width: 72, height: 24)
+        let scale = min(box.width / img.size.width, box.height / img.size.height)
+        let size = CGSize(width: max(1, (img.size.width * scale).rounded()),
+                          height: max(1, (img.size.height * scale).rounded()))
+        let thumb = NSImage(size: size)
         thumb.lockFocus()
-        img.draw(in: CGRect(origin: .zero, size: thumb.size))
+        img.draw(in: CGRect(origin: .zero, size: size))
         thumb.unlockFocus()
         return thumb
     }
