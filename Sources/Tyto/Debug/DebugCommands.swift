@@ -193,6 +193,23 @@ enum DebugCommands {
             case "defaultWidth":
                 guard let w = WidthPreset(rawValue: value) else { throw TytoError.badRequest("bad width") }
                 Settings.defaultWidth = w
+            case "defaultDestination":
+                var list = ScriptsFolder.adoptNewScripts()
+                guard let d = list.destination(matching: value) else { throw TytoError.unknownDestination(value) }
+                list.setDefault(id: d.id)
+                Settings.destinationList = list
+                return .success(destinationsJSON(list))
+            case "destinationClipboard":
+                // What ⇧⌘C copies, for the default destination.
+                var list = ScriptsFolder.adoptNewScripts()
+                guard var d = list.defaultDestination else { throw TytoError.noDestination }
+                guard let choice = ClipboardChoice(rawValue: value) else {
+                    throw TytoError.badRequest("destinationClipboard needs one of \(ClipboardChoice.allCases.map(\.rawValue))")
+                }
+                d.clipboard = choice
+                list.upsert(d)
+                Settings.destinationList = list
+                return .success(destinationsJSON(list))
             default: throw TytoError.badRequest("unknown setting \(key)")
             }
             return .success(settingsJSON())
@@ -243,6 +260,63 @@ enum DebugCommands {
             let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self]) as? [URL] ?? []
             data["fileURLs"] = .array(urls.map { .string($0.path) })
             return .success(data)
+
+        // MARK: Destinations
+
+        case "destinations":
+            return .success(destinationsJSON(ScriptsFolder.adoptNewScripts()))
+
+        case "send":
+            // ⇧⌘C's own path: render, end the session, run the script, update the clipboard.
+            // Waits for the outcome, so a test can check the result and the clipboard after.
+            guard overlay.session != nil else { throw TytoError.noSession }
+            let list = ScriptsFolder.adoptNewScripts()
+            let target = try req.value.map { q in
+                guard let d = list.destination(matching: q) else { throw TytoError.unknownDestination(q) }
+                return d
+            } ?? list.defaultDestination
+            guard let target else { throw TytoError.noDestination }
+            guard target.kind == .script else {
+                throw TytoError.badRequest("\(target.name) is a share destination, which needs a person at the screen")
+            }
+            guard let task = try overlay.send(to: target.id) else { throw TytoError.badRequest("nothing was sent") }
+            return sendResponse(reportJSON(await task.value))
+
+        case "sendrecent":
+            // Recent Captures → Send to <default>, for the newest capture.
+            guard let url = CaptureHistory.recent.first else { throw TytoError.badRequest("no recent captures") }
+            let list = ScriptsFolder.adoptNewScripts()
+            let id = try req.value.map { q in
+                guard let d = list.destination(matching: q) else { throw TytoError.unknownDestination(q) }
+                guard d.kind == .script else { throw TytoError.badRequest("\(d.name) is a share destination") }
+                return d.id
+            }
+            guard let task = app.sendRecent(url, to: id) else { throw TytoError.noDestination }
+            var data = reportJSON(await task.value)
+            data["capture"] = .string(url.path)
+            return sendResponse(data)
+
+        case "resetdestinations":
+            // Forgets every destination and the activity list; scripts stay in the folder, and
+            // come back as hand-written ones on the next scan unless they are removed too.
+            Settings.destinationList = DestinationList()
+            Settings.sendActivity = ActivityLog()
+            return .success()
+
+        case "sends":
+            return .success(["sends": .array(Settings.sendActivity.records.map { r in
+                .object(["date": .string(ISO8601DateFormatter().string(from: r.date)), "destination": .string(r.destination),
+                         "ok": .bool(r.ok), "detail": .string(r.detail)])
+            })])
+
+        case "cliptext":
+            // What a paste into a terminal gets, and every type on the same pasteboard item.
+            let pb = NSPasteboard.general
+            let types = pb.pasteboardItems?.first?.types.map { JSONValue.string($0.rawValue) } ?? []
+            return .success(["text": pb.string(forType: .string).map(JSONValue.string) ?? .null,
+                             "items": JSONValue(pb.pasteboardItems?.count ?? 0),
+                             "types": .array(types),
+                             "changeCount": JSONValue(pb.changeCount)])
 
         case "timings":
             return .success(overlay.lastTimings.json)
@@ -343,6 +417,42 @@ enum DebugCommands {
             "hotKeyCode": JSONValue(Int(Settings.hotKeyCode)),
             "launchAtLogin": .bool(Settings.launchAtLogin),
         ]
+    }
+
+    private static func destinationsJSON(_ list: DestinationList) -> [String: JSONValue] {
+        let scripts = ScriptsFolder.scriptNames()
+        return [
+            "scriptsFolder": ScriptsFolder.url.map { .string($0.path) } ?? .null,
+            "scripts": .array(scripts.map(JSONValue.string)),
+            "default": list.defaultDestination.map { .string($0.name) } ?? .null,
+            "destinations": .array(list.destinations.map { d in
+                var o: [String: JSONValue] = [
+                    "id": .string(d.id.uuidString), "name": .string(d.name), "kind": .string(d.kind.rawValue),
+                    "clipboard": .string(d.clipboard.rawValue), "default": .bool(d.id == list.defaultDestination?.id),
+                ]
+                if let s = d.script { o["script"] = .string(s); o["scriptExists"] = .bool(scripts.contains(s)) }
+                if let p = d.preset { o["preset"] = .string(p.rawValue) }
+                if let s = d.shareService { o["shareService"] = .string(s.rawValue) }
+                return .object(o)
+            }),
+        ]
+    }
+
+    /// A failed send fails the command too, so tytoctl exits non-zero, with the details kept.
+    private static func sendResponse(_ data: [String: JSONValue]) -> DebugResponse {
+        guard data["sent"] == .bool(false) else { return .success(data) }
+        if case .string(let e)? = data["error"] { return DebugResponse(ok: false, error: e, data: data) }
+        return DebugResponse(ok: false, error: "send failed", data: data)
+    }
+
+    private static func reportJSON(_ r: DestinationSender.Report) -> [String: JSONValue] {
+        var d: [String: JSONValue] = ["destination": .string(r.destination), "sent": .bool(r.outcome.ok),
+                                      "clipboard": .string(r.clipboard.rawValue), "message": .string(r.message)]
+        switch r.outcome {
+        case .sent(let result): d["result"] = .string(result)
+        case .failed(let reason): d["error"] = .string(reason)
+        }
+        return d
     }
 
     private static func rectJSON(_ r: PixelRect) -> JSONValue {

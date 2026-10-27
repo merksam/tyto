@@ -36,6 +36,20 @@ usage: tytoctl <command> [options]
   settings                              print current settings
   recent                                list recent captures
 
+  destinations                          list destinations, the default and the scripts folder
+  send [NAME]                           send the selection as ⇧⌘C does (default destination
+                                        unless NAME); waits and reports the result, ends session
+  sendrecent [NAME]                     send the newest recent capture (Recent Captures menu)
+  sends                                 the activity list, newest first
+  cliptext                              clipboard text and the types on its first item
+  set defaultDestination NAME           make NAME the default
+  set destinationClipboard CHOICE       what ⇧⌘C copies for the default: result|resultAndImage|nothing
+  resetdestinations                     forget every destination and the activity list
+  render PRESET [KEY=VALUE ...]         print a preset's script (local, no socket); presets:
+                                        ssh host folder [baseURL] | s3 bucket [prefix endpoint
+                                        profile publicBaseURL expiresIn] | webhook url
+                                        [keychainItem jsonField] | custom
+
   container                             print the app's sandbox container Data directory (local, no socket)
 
 SPEC: all | main | secondary | <CGDirectDisplayID>     (default: all for capture, main otherwise)
@@ -52,6 +66,29 @@ guard let cmd = args.first else { die(usage) }
 if cmd == "--help" || cmd == "-h" { print(usage); exit(0) }
 if cmd == "container" { print(DebugSocket.containerDataDirectory); exit(0) }
 args.removeFirst()
+
+// The same rendering Settings → Destinations uses, so a script can be checked or installed by
+// hand without the app.
+if cmd == "render" {
+    guard let name = args.first, let preset = PresetID(rawValue: name) else {
+        die("render needs one of \(PresetID.allCases.map(\.rawValue).joined(separator: ", "))")
+    }
+    var values: [String: String] = [:]
+    for pair in args.dropFirst() {
+        guard let eq = pair.firstIndex(of: "=") else { die("render: \(pair) is not KEY=VALUE") }
+        let key = String(pair[..<eq])
+        guard preset.fields.contains(where: { $0.key == key }) else {
+            die("render: \(preset.rawValue) has no field \(key); fields: \(preset.fields.map(\.key).joined(separator: ", "))")
+        }
+        values[key] = String(pair[pair.index(after: eq)...])
+    }
+    let problems = preset.validate(values)
+    guard problems.isEmpty else {
+        die(problems.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "\n"))
+    }
+    print(preset.render(values), terminator: "")
+    exit(0)
+}
 
 var request = DebugRequest(cmd: cmd)
 var positional: [String] = []
@@ -86,6 +123,8 @@ case "text":
     guard positional.count >= 3, let x = Int(positional[0]), let y = Int(positional[1]) else { die("text needs X Y STRING") }
     request.x = x; request.y = y
     request.value = positional[2...].joined(separator: " ")
+case "send", "sendrecent":
+    request.value = positional.first
 case "tool", "color", "width", "uitool":
     guard let v = positional.first else { die("\(cmd) needs a value") }
     request.value = v
@@ -125,7 +164,8 @@ let connected = withUnsafePointer(to: &addr) {
 }
 guard connected == 0 else { die("cannot connect to Tyto at \(path) (is Tyto running in debug mode?)") }
 
-var timeout = timeval(tv_sec: 60, tv_usec: 0)
+// Longer than a destination script's 60 s, so `send` reports a timeout instead of dying first.
+var timeout = timeval(tv_sec: 90, tv_usec: 0)
 setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
 let encoded = try! JSONEncoder().encode(request)
@@ -145,7 +185,7 @@ var searchFrom = 0
 var newlineIndex: Int?
 while newlineIndex == nil {
     let n = read(fd, &chunk, chunk.count)
-    guard n > 0 else { die("connection closed before a response arrived (timeout 60s)") }
+    guard n > 0 else { die("connection closed before a response arrived (timeout 90s)") }
     response.append(contentsOf: chunk[0..<n])
     if let idx = response[searchFrom...].firstIndex(of: 0x0A) { newlineIndex = idx }
     else { searchFrom = response.count }
