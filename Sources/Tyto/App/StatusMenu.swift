@@ -1,4 +1,5 @@
 import AppKit
+import TytoCore
 
 final class StatusMenu: NSObject, NSMenuDelegate {
     private let item: NSStatusItem
@@ -10,7 +11,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let onCapture: () -> Void
     private let onCaptureOverMenu: () -> Void
     private let onOpenSettings: () -> Void
+    private let onSendRecent: (URL) -> Void
     private var hintPopover: NSPopover?
+
+    /// The owl itself, for anything that has to point at the app with no window of its own.
+    var button: NSStatusBarButton? { item.button }
 
     /// Told when the menu opens (true) and closes (false).
     var onOpenChange: ((Bool) -> Void)?
@@ -129,10 +134,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     init(onCapture: @escaping () -> Void, onCaptureOverMenu: @escaping () -> Void,
-         onOpenSettings: @escaping () -> Void) {
+         onOpenSettings: @escaping () -> Void, onSendRecent: @escaping (URL) -> Void) {
         self.onCapture = onCapture
         self.onCaptureOverMenu = onCaptureOverMenu
         self.onOpenSettings = onOpenSettings
+        self.onSendRecent = onSendRecent
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
@@ -193,14 +199,34 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         } else {
             let df = DateFormatter()
             df.dateFormat = "MMM d, HH:mm:ss"
-            for url in recent.prefix(12) {
+            let entries = recent.prefix(12).map { url in
                 let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
-                let mi = NSMenuItem(title: df.string(from: date), action: #selector(copyRecent(_:)), keyEquivalent: "")
+                return (url: url, title: df.string(from: date), thumbnail: thumbnail(for: url))
+            }
+            for entry in entries {
+                let mi = NSMenuItem(title: entry.title, action: #selector(copyRecent(_:)), keyEquivalent: "")
                 mi.target = self
-                mi.representedObject = url
-                mi.image = thumbnail(for: url)
-                mi.toolTip = url.lastPathComponent
+                mi.representedObject = entry.url
+                mi.image = entry.thumbnail
+                mi.toolTip = entry.url.lastPathComponent
                 recentMenu.addItem(mi)
+            }
+            // The same captures again, one level down: clicking a capture still copies it, as
+            // it always has, and an older one can go to the default destination unretaken.
+            if let target = ScriptsFolder.adoptNewScripts().defaultDestination {
+                recentMenu.addItem(.separator())
+                let send = NSMenuItem(title: "Send to \(target.name)", action: nil, keyEquivalent: "")
+                let sendMenu = NSMenu()
+                for entry in entries {
+                    let mi = NSMenuItem(title: entry.title, action: #selector(sendRecent(_:)), keyEquivalent: "")
+                    mi.target = self
+                    mi.representedObject = entry.url
+                    mi.image = entry.thumbnail
+                    mi.toolTip = entry.url.lastPathComponent
+                    sendMenu.addItem(mi)
+                }
+                send.submenu = sendMenu
+                recentMenu.addItem(send)
             }
             recentMenu.addItem(.separator())
             let reveal = NSMenuItem(title: "Open Captures Folder", action: #selector(openFolder), keyEquivalent: "")
@@ -239,6 +265,11 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         }
     }
     @objc private func clearRecent() { CaptureHistory.clear() }
+
+    @objc private func sendRecent(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        onSendRecent(url)
+    }
 
     /// Re-copy a past capture to the clipboard so it can be pasted again.
     @objc private func copyRecent(_ sender: NSMenuItem) {

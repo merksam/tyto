@@ -100,6 +100,11 @@ public struct DestinationList: Codable, Equatable, Sendable {
 
     /// Replaces the destination with the same id, or appends it. The first one becomes the default.
     public mutating func upsert(_ destination: Destination) {
+        // A script written for a preset may have been adopted as a hand-written one while the
+        // save panel was up; the preset's destination owns it.
+        if destination.preset != nil, let script = destination.script {
+            destinations.removeAll { $0.id != destination.id && $0.preset == nil && $0.script == script }
+        }
         if let i = destinations.firstIndex(where: { $0.id == destination.id }) {
             destinations[i] = destination
         } else {

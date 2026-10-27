@@ -78,6 +78,14 @@ import Testing
         #expect(list.destination(matching: "upload") != nil)
     }
 
+    @Test func aPresetTakesItsScriptBackFromAnAdoptedCopy() {
+        var list = DestinationList()
+        list.adoptScripts(["devbox.sh"])
+        list.upsert(Destination(name: "box", kind: .script, script: "devbox.sh", preset: .ssh))
+        #expect(list.destinations.map(\.name) == ["box"])
+        #expect(list.defaultDestination?.name == "box")
+    }
+
     @Test func scriptFileNamesNeedNoQuoting() {
         #expect(Destination.scriptFileName(for: "devbox") == "devbox.sh")
         #expect(Destination.scriptFileName(for: "My S3 — bucket!") == "my-s3-bucket.sh")

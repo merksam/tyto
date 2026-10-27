@@ -11,16 +11,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var debugServer: DebugServer?
     #endif
     let capturer = ScreenCapturer()
+    let sender = DestinationSender()
     private(set) var overlay: OverlayController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        overlay = OverlayController(capturer: capturer)
+        overlay = OverlayController(capturer: capturer, sender: sender)
+        overlay.onOpenDestinationSettings = { [weak self] in self?.openSettings(.destinations) }
         overlay.onSessionEnd = { [weak self] outcome in
             Log.overlay.info("session ended: \(String(describing: outcome))")
             // A finished capture is the real end of onboarding: the permission is granted and
             // the user has found the shortcut. Nothing left to explain.
             switch outcome {
-            case .copied, .saved:
+            case .copied, .saved, .sent:
                 self?.markOnboarded()
             case .cancelled:
                 // The overlay takes the welcome window off screen with it. If it was up when
@@ -34,7 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusMenu = StatusMenu(onCapture: { [weak self] in self?.requestCapture() },
                                 onCaptureOverMenu: { [weak self] in self?.captureOverMenu() },
-                                onOpenSettings: { [weak self] in self?.openSettings() })
+                                onOpenSettings: { [weak self] in self?.openSettings() },
+                                onSendRecent: { [weak self] url in self?.sendRecent(url) })
+        sender.shareAnchor = { [weak self] in self?.statusMenu?.button }
         // While the menu is up the chord has to reach the menu's own watcher as a key press.
         // Left registered, the window server turns it into a hotkey event that the tracking
         // menu never sees and that fires only once the menu has closed.
@@ -78,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         Clipboard.pruneFileCopies()
+        Outbox.prune()
         Log.app.info("Tyto launched (pid \(getpid()))")
     }
 
@@ -105,9 +110,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     var isSettingsWindowVisible: Bool { settingsWindowController?.isVisible ?? false }
 
-    func openSettings() {
+    func openSettings(_ pane: SettingsWindowController.Pane? = nil) {
         if settingsWindowController == nil { settingsWindowController = SettingsWindowController() }
-        settingsWindowController?.show()
+        settingsWindowController?.show(pane)
+    }
+
+    /// Recent Captures → Send to <default>: the saved PNG takes the same send as ⇧⌘C, without
+    /// a retake. Returns the running send, or nil if there was nothing to send or the share
+    /// sheet took it.
+    @discardableResult
+    func sendRecent(_ url: URL, to destinationID: UUID? = nil) -> Task<DestinationSender.Report, Never>? {
+        let list = Settings.destinationList
+        guard let destination = destinationID.flatMap(list.destination(id:)) ?? list.defaultDestination else { return nil }
+        guard let image = Settings.withSaveDirectoryAccess({ _ in CaptureHistory.image(at: url) }) else {
+            sender.hud.show("\(destination.name) failed: could not read \(url.lastPathComponent)", style: .failure)
+            return nil
+        }
+        if destination.kind == .share {
+            sender.share(image, service: destination.shareService ?? .picker, name: destination.name,
+                         returnTo: NSWorkspace.shared.frontmostApplication)
+            return nil
+        }
+        return sender.send(image, to: destination)
     }
 
     var isWelcomeWindowVisible: Bool { welcomeWindowController?.isVisible ?? false }

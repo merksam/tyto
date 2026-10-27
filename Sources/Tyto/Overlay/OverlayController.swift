@@ -17,6 +17,7 @@ struct SessionOptions: Sendable {
 enum SessionOutcome: Sendable {
     case copied(rect: PixelRect, displayID: CGDirectDisplayID)
     case saved(URL)
+    case sent(to: String)
     case cancelled
 }
 
@@ -50,19 +51,23 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     }
 
     private let capturer: ScreenCapturer
+    private let sender: DestinationSender
     private var windows: [CGDirectDisplayID: OverlayWindow] = [:]
     private let toolbarPanel = ToolbarPanel()
     private var sessionSerial = 0
     private(set) var session: Session?
     private(set) var lastTimings = CaptureTimings()
     var onSessionEnd: ((SessionOutcome) -> Void)?
+    /// "Edit Destinations…" in the Send menu.
+    var onOpenDestinationSettings: (() -> Void)?
 
     private(set) var tool: Tool = Settings.defaultTool
     private(set) var color: RGBAColor = Settings.defaultColor
     private(set) var width: WidthPreset = Settings.defaultWidth
 
-    init(capturer: ScreenCapturer) {
+    init(capturer: ScreenCapturer, sender: DestinationSender) {
         self.capturer = capturer
+        self.sender = sender
         toolbarPanel.annotationToolbar.delegate = self
     }
 
@@ -79,6 +84,7 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         tool = Settings.defaultTool
         color = Settings.defaultColor
         width = Settings.defaultWidth
+        toolbarPanel.annotationToolbar.setDestinations(Settings.destinationList)
         let start = ContinuousClock.now
         var timings = CaptureTimings()
         timings.requestedAt = Date()
@@ -171,13 +177,19 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         return (rect, image)
     }
 
-    /// Composites, writes to the clipboard and ends the session.
-    @discardableResult
-    func copy() throws -> (rect: PixelRect, image: CGImage) {
+    /// The image ⌘C, ⌘S and every send deliver: text still being typed is committed first, then
+    /// the one export path renders it, so no two of them can disagree.
+    private func finishedImage() throws -> (rect: PixelRect, image: CGImage) {
         if let s = session, let id = s.activeDisplay, let v = windows[id]?.selectionView, v.isEditingText {
             v.commitTextEditing()
         }
-        let (rect, image) = try exportImage()
+        return try exportImage()
+    }
+
+    /// Composites, writes to the clipboard and ends the session.
+    @discardableResult
+    func copy() throws -> (rect: PixelRect, image: CGImage) {
+        let (rect, image) = try finishedImage()
         guard let id = session?.activeDisplay else { throw TytoError.noSession }
         let start = ContinuousClock.now
         try Clipboard.write(image: image, alsoAsFile: Settings.copyAsFile)
@@ -251,6 +263,66 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         }
         previousApp?.activate()
         onSessionEnd?(saved.map(SessionOutcome.saved) ?? .cancelled)
+    }
+
+    // MARK: Sending
+
+    /// ⇧⌘C (nil: the default destination), the Send button and its menu. Renders what ⌘C would
+    /// copy and takes the overlay down at once, so the user is back where they were; the send
+    /// runs after that. Returns the running send, or nil when the share sheet took it.
+    @discardableResult
+    func send(to destinationID: UUID? = nil) throws -> Task<DestinationSender.Report, Never>? {
+        guard session != nil else { throw TytoError.noSession }
+        let list = Settings.destinationList
+        let destination: Destination
+        if let destinationID {
+            guard let d = list.destination(id: destinationID) else { throw TytoError.unknownDestination(destinationID.uuidString) }
+            destination = d
+        } else {
+            guard let d = list.defaultDestination else { throw TytoError.noDestination }
+            destination = d
+        }
+        let (_, image) = try finishedImage()
+        CaptureHistory.record(image)
+        if destination.kind == .share {
+            handToShareSheet(image, service: destination.shareService ?? .picker, name: destination.name)
+            return nil
+        }
+        end(.sent(to: destination.name))
+        return sender.send(image, to: destination)
+    }
+
+    /// "Share…" in the Send menu: the system picker, for this one capture.
+    func share() {
+        do {
+            let (_, image) = try finishedImage()
+            CaptureHistory.record(image)
+            handToShareSheet(image, service: .picker, name: "Share")
+        } catch {
+            Log.overlay.error("share failed to render: \(String(describing: error))")
+        }
+    }
+
+    /// Like save(): the previous app is not brought back yet, the share UI needs Tyto in front.
+    private func handToShareSheet(_ image: CGImage, service: ShareService, name: String) {
+        guard let s = session else { return }
+        teardown(s, reactivatePrevious: false)
+        session = nil
+        onSessionEnd?(.sent(to: name))
+        guard s.options.interactive else { return }
+        sender.share(image, service: service, name: name, returnTo: s.previousApp)
+    }
+
+    private func sendFromUI(_ destinationID: UUID?) {
+        do {
+            try send(to: destinationID)
+        } catch TytoError.noDestination {
+            // The overlay stays up: nothing is lost, and the note says where to go.
+            NSSound.beep()
+            sender.hud.show("No destination yet. Add one in Settings → Destinations.", style: .failure)
+        } catch {
+            Log.overlay.error("send failed: \(String(describing: error))")
+        }
     }
 
     /// Test path: render the composite, write it to `url`, and end the session (no panel).
@@ -648,6 +720,9 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
         case (.command, "c"):
             do { try copy() } catch { Log.overlay.error("copy failed: \(String(describing: error))") }
             return true
+        case ([.command, .shift], "c"):
+            sendFromUI(nil)
+            return true
         case (.command, "s"):
             save()
             return true
@@ -674,4 +749,10 @@ final class OverlayController: SelectionViewDelegate, ToolbarDelegate {
     }
     func toolbarDidRequestSave(_ toolbar: ToolbarView) { save() }
     func toolbarDidRequestCancel(_ toolbar: ToolbarView) { cancel() }
+    func toolbar(_ toolbar: ToolbarView, didRequestSendTo destinationID: UUID?) { sendFromUI(destinationID) }
+    func toolbarDidRequestShare(_ toolbar: ToolbarView) { share() }
+    func toolbarDidRequestDestinationSettings(_ toolbar: ToolbarView) {
+        cancel()
+        onOpenDestinationSettings?()
+    }
 }

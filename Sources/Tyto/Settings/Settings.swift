@@ -112,6 +112,31 @@ enum Settings {
         }
     }
 
+    // MARK: Destinations
+
+    /// One JSON value, so the list, the default and the dismissed scripts change together.
+    /// Data from a newer Tyto reads as empty here and is left alone until something is saved.
+    static var destinationList: DestinationList {
+        get { d.data(forKey: "destinations").flatMap(DestinationList.decode) ?? DestinationList() }
+        set {
+            guard let data = try? newValue.encoded() else { return }
+            d.set(data, forKey: "destinations")
+            NotificationCenter.default.post(name: destinationsChanged, object: nil)
+        }
+    }
+
+    static var sendActivity: ActivityLog {
+        get { d.data(forKey: "sendActivity").flatMap(ActivityLog.decode) ?? ActivityLog() }
+        set {
+            guard let data = try? newValue.encoded() else { return }
+            d.set(data, forKey: "sendActivity")
+            NotificationCenter.default.post(name: destinationsChanged, object: nil)
+        }
+    }
+
+    /// Posted when a destination or the activity list changes, so open views can follow.
+    static let destinationsChanged = Notification.Name("TytoDestinationsChanged")
+
     // MARK: Global hotkey (Carbon key code + Carbon modifier mask)
 
     static var hotKeyCode: UInt32 {
