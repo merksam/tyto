@@ -35,6 +35,12 @@ Tyto contains no networking code. No uploads, no analytics, no account.
 entitlements: the sandbox itself, read/write to Pictures, user-selected files for the save
 panel, and app-scoped bookmarks so a chosen save folder survives a restart.
 
+Destinations (⇧⌘C) don't change that. A destination is a shell script in
+`~/Library/Application Scripts/com.yevhenii.tyto/`, written by you or generated from a preset
+and saved through a save panel. macOS runs it outside the sandbox, as you, so the script can
+upload a capture – Tyto itself still can't. Nothing runs until you press ⇧⌘C or pick a
+destination.
+
 The full privacy statement is at [tyto.random.travel](https://tyto.random.travel/privacy.html).
 
 ## Contributing
