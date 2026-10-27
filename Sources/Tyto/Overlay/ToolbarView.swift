@@ -10,6 +10,10 @@ protocol ToolbarDelegate: AnyObject {
     func toolbarDidRequestSave(_ toolbar: ToolbarView)
     func toolbarDidRequestCopy(_ toolbar: ToolbarView)
     func toolbarDidRequestCancel(_ toolbar: ToolbarView)
+    /// nil: the default destination.
+    func toolbar(_ toolbar: ToolbarView, didRequestSendTo destinationID: UUID?)
+    func toolbarDidRequestShare(_ toolbar: ToolbarView)
+    func toolbarDidRequestDestinationSettings(_ toolbar: ToolbarView)
 }
 
 /// Floating Liquid Glass tool strip shown next to the selection.
@@ -26,6 +30,10 @@ final class ToolbarView: NSView {
     private let undoButton = NSButton()
     private let redoButton = NSButton()
     private let saveButton = NSButton()
+    private let sendButton = NSButton()
+    private let sendMenuButton = NSButton()
+    private let sendMenu = NSMenu()
+    private var hasDestinations = false
     private let copyButton = NSButton()
     private let cancelButton = NSButton()
 
@@ -54,6 +62,20 @@ final class ToolbarView: NSView {
         saveButton.target = self
         saveButton.action = #selector(saveTapped)
 
+        // A click sends to the default destination; the chevron next to it opens the menu of
+        // all of them. Two glass buttons rather than an NSComboButton, so they match the rest.
+        sendButton.bezelStyle = .glass
+        sendButton.controlSize = .large
+        sendButton.lineBreakMode = .byTruncatingTail
+        sendButton.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
+        sendButton.target = self; sendButton.action = #selector(sendTapped)
+        sendMenuButton.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: "Send to")
+        sendMenuButton.bezelStyle = .glass
+        sendMenuButton.controlSize = .large
+        sendMenuButton.toolTip = "Send to…"
+        sendMenuButton.target = self; sendMenuButton.action = #selector(sendMenuTapped)
+        setDestinations(DestinationList())
+
         copyButton.title = "Copy"
         copyButton.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "Copy")
         copyButton.imagePosition = .imageLeading
@@ -73,9 +95,11 @@ final class ToolbarView: NSView {
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
         for v in [tools, Self.separator(), colors, Self.separator(), widths, Self.separator(),
-                  undoButton, redoButton, Self.separator(), saveButton, copyButton, cancelButton] {
+                  undoButton, redoButton, Self.separator(), saveButton, sendButton, sendMenuButton,
+                  copyButton, cancelButton] {
             stack.addArrangedSubview(v)
         }
+        stack.setCustomSpacing(2, after: sendButton)
         stack.translatesAutoresizingMaskIntoConstraints = false
         glass.contentView = stack
         glass.translatesAutoresizingMaskIntoConstraints = false
@@ -104,6 +128,34 @@ final class ToolbarView: NSView {
         tools.performClick(nil)
     }
 
+
+    /// The Send button names the default ("→ devbox"); its menu lists every destination, then
+    /// the share sheet. With none set up the button just opens the menu.
+    func setDestinations(_ list: DestinationList) {
+        let target = list.defaultDestination
+        hasDestinations = target != nil
+        sendButton.title = target.map { "→ \($0.name)" } ?? "Send"
+        sendButton.toolTip = target.map { "Send to \($0.name) (⇧⌘C)" } ?? "Send to… Set up destinations in Settings."
+
+        sendMenu.removeAllItems()
+        for d in list.destinations {
+            let item = NSMenuItem(title: d.name, action: #selector(sendMenuItemChosen(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = d.id
+            item.state = d.id == target?.id ? .on : .off
+            sendMenu.addItem(item)
+        }
+        if !list.destinations.isEmpty { sendMenu.addItem(.separator()) }
+        let share = NSMenuItem(title: "Share…", action: #selector(shareChosen), keyEquivalent: "")
+        share.target = self
+        share.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: nil)
+        sendMenu.addItem(share)
+        sendMenu.addItem(.separator())
+        let edit = NSMenuItem(title: list.destinations.isEmpty ? "Add a Destination…" : "Edit Destinations…",
+                              action: #selector(editDestinationsChosen), keyEquivalent: "")
+        edit.target = self
+        sendMenu.addItem(edit)
+    }
 
     func setState(tool: Tool, color: RGBAColor, width: WidthPreset, canUndo: Bool, canRedo: Bool) {
         let toolIndex = Tool.allCases.firstIndex(of: tool) ?? 0
@@ -246,5 +298,19 @@ final class ToolbarView: NSView {
     @objc private func redoTapped() { delegate?.toolbarDidRequestRedo(self) }
     @objc private func saveTapped() { delegate?.toolbarDidRequestSave(self) }
     @objc private func copyTapped() { delegate?.toolbarDidRequestCopy(self) }
+    @objc private func sendTapped() {
+        if hasDestinations { delegate?.toolbar(self, didRequestSendTo: nil) } else { popUpSendMenu(from: sendButton) }
+    }
+    @objc private func sendMenuTapped() { popUpSendMenu(from: sendMenuButton) }
+    @objc private func sendMenuItemChosen(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        delegate?.toolbar(self, didRequestSendTo: id)
+    }
+    @objc private func shareChosen() { delegate?.toolbarDidRequestShare(self) }
+    @objc private func editDestinationsChosen() { delegate?.toolbarDidRequestDestinationSettings(self) }
+
+    private func popUpSendMenu(from view: NSView) {
+        sendMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.bounds.height + 4), in: view)
+    }
     @objc private func cancelTapped() { delegate?.toolbarDidRequestCancel(self) }
 }

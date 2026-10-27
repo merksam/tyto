@@ -40,6 +40,12 @@ enum CaptureHistory {
         prepend(url)
     }
 
+    /// A saved capture decoded back, for sending it again. Call within the save folder's scope.
+    static func image(at url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
     static func clear() {
         UserDefaults.standard.removeObject(forKey: key)
     }

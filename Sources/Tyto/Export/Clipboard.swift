@@ -4,13 +4,17 @@ enum Clipboard {
     /// Writes one pasteboard item carrying both PNG (browsers, Slack, Electron apps) and
     /// TIFF (older Cocoa apps such as Mail and Preview prefer it). With `alsoAsFile`, a PNG is
     /// written to the caches folder and its URL added so Finder and file-only targets accept it.
-    static func write(image: CGImage, alsoAsFile: Bool = false) throws {
+    ///
+    /// With `text`, the same item also carries it as a string: a terminal pastes the text, an
+    /// image app the image. That is how a destination's result and the image travel together.
+    static func write(image: CGImage, text: String? = nil, alsoAsFile: Bool = false) throws {
         let png = try PNGEncoder.data(image)
         let item = NSPasteboardItem()
         item.setData(png, forType: .png)
         if let tiff = NSBitmapImageRep(cgImage: image).tiffRepresentation {
             item.setData(tiff, forType: .tiff)
         }
+        if let text { item.setString(text, forType: .string) }
         var objects: [NSPasteboardWriting] = [item]
         if alsoAsFile {
             let dir = fileCopyDirectory
@@ -26,6 +30,12 @@ enum Clipboard {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.writeObjects(objects)
+    }
+
+    static func write(text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
     }
 
     /// Temp copies for "also copy as file". Inside the app container when sandboxed, so macOS can

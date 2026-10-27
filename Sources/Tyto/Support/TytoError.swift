@@ -12,6 +12,8 @@ nonisolated enum TytoError: Error, CustomStringConvertible {
     case encodeFailed
     case badRequest(String)
     case clipboardEmpty
+    case noDestination
+    case unknownDestination(String)
 
     var description: String {
         switch self {
@@ -26,6 +28,8 @@ nonisolated enum TytoError: Error, CustomStringConvertible {
         case .encodeFailed: "image encoding failed"
         case .badRequest(let s): "bad request: \(s)"
         case .clipboardEmpty: "clipboard holds no image"
+        case .noDestination: "no destination yet: add one in Settings → Destinations"
+        case .unknownDestination(let s): "no destination named \(s)"
         }
     }
 }
