@@ -173,12 +173,14 @@ extension ShareService {
     }
 }
 
-/// The PNG a destination reads, named as the contract says. It lives in the container's temp
-/// folder: Tyto can write nowhere else without asking, and the script, running as the user,
-/// can read it there.
+/// The PNG a destination reads, named as the contract says. Not in the container's temp folder:
+/// macOS keeps other processes out of an app's container, and a script, though it runs as the
+/// user, is another process; scp got "Operation not permitted" there. ~/Pictures is the one
+/// place Tyto may write without asking (the pictures entitlement), so the file goes into a
+/// hidden folder beside the captures.
 enum Outbox {
     static var directory: URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("Outbox", isDirectory: true)
+        Settings.defaultSaveDirectory.appendingPathComponent(".outbox", isDirectory: true)
     }
 
     /// One folder per send, so two sends in the same second keep their own file and `$1`
