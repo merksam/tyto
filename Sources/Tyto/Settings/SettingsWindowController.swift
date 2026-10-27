@@ -7,15 +7,19 @@ import SwiftUI
 
     private var window: NSWindow?
     private var tabs: NSTabViewController?
+    let destinations = DestinationsModel()
 
     var isVisible: Bool { window?.isVisible ?? false }
+    var frame: CGRect? { window?.frame }
+
+    func close() { window?.orderOut(nil) }
 
     func show(_ pane: Pane? = nil) {
         if window == nil {
             let tabs = NSTabViewController()
             tabs.tabStyle = .toolbar
             tabs.addTabViewItem(Self.tab(SettingsView(), label: "General", symbol: "gearshape"))
-            tabs.addTabViewItem(Self.tab(DestinationsView(), label: "Destinations", symbol: "paperplane"))
+            tabs.addTabViewItem(Self.tab(DestinationsView(model: destinations), label: "Destinations", symbol: "paperplane"))
             let w = NSWindow(contentViewController: tabs)
             w.styleMask = [.titled, .closable, .miniaturizable]
             w.isReleasedWhenClosed = false

@@ -115,6 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindowController?.show(pane)
     }
 
+    var settingsWindow: SettingsWindowController? { settingsWindowController }
+
     /// Recent Captures → Send to <default>: the saved PNG takes the same send as ⇧⌘C, without
     /// a retake. Returns the running send, or nil if there was nothing to send or the share
     /// sheet took it.

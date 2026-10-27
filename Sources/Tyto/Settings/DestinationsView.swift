@@ -149,7 +149,7 @@ struct DestinationDraft: Identifiable {
 }
 
 struct DestinationsView: View {
-    @StateObject private var model = DestinationsModel()
+    @ObservedObject var model: DestinationsModel
 
     var body: some View {
         Form {

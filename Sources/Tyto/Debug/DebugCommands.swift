@@ -296,6 +296,14 @@ enum DebugCommands {
             data["capture"] = .string(url.path)
             return sendResponse(data)
 
+        case "removedestination":
+            guard let q = req.value else { throw TytoError.badRequest("removedestination needs a NAME") }
+            var list = ScriptsFolder.adoptNewScripts()
+            guard let d = list.destination(matching: q) else { throw TytoError.unknownDestination(q) }
+            list.remove(id: d.id)
+            Settings.destinationList = list
+            return .success(destinationsJSON(list))
+
         case "resetdestinations":
             // Forgets every destination and the activity list; scripts stay in the folder, and
             // come back as hand-written ones on the next scan unless they are removed too.
@@ -324,6 +332,26 @@ enum DebugCommands {
         case "welcome":
             app.openWelcome()
             return .success()
+
+        case "settingswindow":
+            // general | destinations | new (the New Destination sheet) | close. Returns the
+            // window frame in points, origin at the bottom left of the main display.
+            switch req.value ?? "general" {
+            case "close":
+                app.settingsWindow?.close()
+                return .success()
+            case "destinations":
+                app.openSettings(.destinations)
+            case "new":
+                app.openSettings(.destinations)
+                app.settingsWindow?.destinations.draft = DestinationDraft()
+            default:
+                app.openSettings(.general)
+            }
+            try await Task.sleep(for: .milliseconds(600))   // tab resize and sheet animations
+            guard let f = app.settingsWindow?.frame else { throw TytoError.badRequest("no settings window") }
+            return .success(["x": JSONValue(Double(f.minX)), "y": JSONValue(Double(f.minY)),
+                             "width": JSONValue(Double(f.width)), "height": JSONValue(Double(f.height))])
 
         case "bend":
             // Drags the selected arrow's middle handle to (x, y) through the real press/drag/

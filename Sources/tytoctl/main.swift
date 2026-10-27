@@ -44,6 +44,9 @@ usage: tytoctl <command> [options]
   cliptext                              clipboard text and the types on its first item
   set defaultDestination NAME           make NAME the default
   set destinationClipboard CHOICE       what ⇧⌘C copies for the default: result|resultAndImage|nothing
+  removedestination NAME                remove one destination (its script stays in the folder)
+  settingswindow [PANE]                 open Settings: general|destinations|new (the New
+                                        Destination sheet)|close; prints the window frame
   resetdestinations                     forget every destination and the activity list
   render PRESET [KEY=VALUE ...]         print a preset's script (local, no socket); presets:
                                         ssh host folder [baseURL] | s3 bucket [prefix endpoint
@@ -125,6 +128,11 @@ case "text":
     request.value = positional[2...].joined(separator: " ")
 case "send", "sendrecent":
     request.value = positional.first
+case "settingswindow":
+    request.value = positional.first
+case "removedestination":
+    guard let v = positional.first else { die("removedestination needs a NAME") }
+    request.value = v
 case "tool", "color", "width", "uitool":
     guard let v = positional.first else { die("\(cmd) needs a value") }
     request.value = v
